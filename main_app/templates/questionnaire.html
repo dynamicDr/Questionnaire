@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>问卷录入</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            margin-bottom: 10px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            background-color: #f5f5f5;
+        }
+        form.inline {
+            display: inline-block;
+            margin: 0;
+        }
+        input[type="text"], input[type="number"] {
+            width: 120px;
+            box-sizing: border-box;
+            font-size: 13px;
+        }
+        .section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 30px;
+            border-radius: 4px;
+        }
+        .section-title {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .create-form-row {
+            margin-bottom: 8px;
+        }
+        .create-form-row label {
+            display: inline-block;
+            width: 130px;
+        }
+        .submit-btn {
+            padding: 4px 10px;
+            font-size: 13px;
+        }
+        .score-input {
+            width: 40px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="section" style="margin-bottom: 15px; border-color: #bbb;">
+    <div class="section-title">问卷管理导航</div>
+    <a href="{% url 'questionnaire_add' %}"
+       style="margin-right: 10px; font-weight: {% if request.resolver_match.url_name == 'questionnaire_add' %}bold{% else %}normal{% endif %};">
+        问卷录入
+    </a>
+    <a href="{% url 'questionnaire_view' %}"
+       style="font-weight: {% if request.resolver_match.url_name == 'questionnaire_view' %}bold{% else %}normal{% endif %};">
+        问卷查看
+    </a>
+</div>
+
+<h1>问卷录入</h1>
+
+<div class="section">
+    <h3>新增团</h3>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="entity" value="group">
+        <input type="hidden" name="action" value="create">
+
+        <div class="create-form-row">
+            <label>团号：</label>
+            <input type="text" name="group_no" required>
+        </div>
+        <div class="create-form-row">
+            <label>地接社：</label>
+            <input type="text" name="agency">
+        </div>
+        <div class="create-form-row">
+            <label>酒店：</label>
+            <input type="text" name="hotel">
+        </div>
+        <div class="create-form-row">
+            <label>地区：</label>
+            <input type="text" name="region">
+        </div>
+        <div class="create-form-row">
+            <label>人数：</label>
+            <input type="number" name="people_count" min="0">
+        </div>
+        <div class="create-form-row">
+            <label>意见表回收数量：</label>
+            <input type="number" name="feedback_count" min="0">
+        </div>
+        <div class="create-form-row">
+            <label>开始日期：</label>
+            <input type="date" name="start_date">
+        </div>
+        <div class="create-form-row">
+            <label>截止日期：</label>
+            <input type="date" name="end_date">
+        </div>
+
+        <button type="submit" class="submit-btn">新增</button>
+    </form>
+
+    <h3>团列表</h3>
+    <table id="group-table">
+        <thead>
+        <tr>
+            <th>序号</th>
+            <th>团号</th>
+            <th>地接社</th>
+            <th>酒店</th>
+            <th>地区</th>
+            <th>人数</th>
+            <th>意见表回收数量</th>
+            <th>回收率</th>
+            <th>开始日期</th>
+            <th>截止日期</th>
+            <th>操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for idx, g, traveler_count in groups %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>
+                    <form method="post" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="entity" value="group">
+                        <input type="hidden" name="action" value="update">
+                        <input type="hidden" name="index" value="{{ idx }}">
+                        <input type="text" name="group_no" value="{{ g.group_no }}">
+                </td>
+                <td>
+                        <input type="text" name="agency" value="{{ g.agency }}">
+                </td>
+                <td>
+                        <input type="text" name="hotel" value="{{ g.hotel }}">
+                </td>
+                <td>
+                        <input type="text" name="region" value="{{ g.region }}">
+                </td>
+                <td>
+                        <input type="number" name="people_count" value="{{ g.people_count }}">
+                </td>
+                <td>
+                        <input type="number" name="feedback_count" value="{{ g.feedback_count }}">
+                </td>
+                <td>
+                        {{ g.feedback_rate }}
+                </td>
+                <td>
+                        <input type="date" name="start_date" value="{{ g.start_date }}">
+                </td>
+                <td>
+                        <input type="date" name="end_date" value="{{ g.end_date }}">
+                </td>
+                <td>
+                        <button type="submit" class="submit-btn">保存</button>
+                    </form>
+
+                    <form method="post" class="inline group-delete-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="entity" value="group">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="index" value="{{ idx }}">
+                        <button type="submit" class="submit-btn group-delete-btn"
+                                data-traveler-count="{{ traveler_count }}">删除</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="10">暂无团数据。</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <div id="group-pager" class="pager"></div>
+</div>
+
+<div class="section">
+    <h3>新增旅客问卷</h3>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="entity" value="traveler">
+        <input type="hidden" name="action" value="create">
+
+        <div class="create-form-row">
+            <label>所属团号：</label>
+            <input type="text" name="group_no" required value="{{ last_group_no }}">
+        </div>
+        <div class="create-form-row">
+            <label>地陪语言和讲解：</label>
+            <input type="text" name="guide_language" maxlength="1" class="score-input auto-next" pattern="[1-5]">
+        </div>
+        <div class="create-form-row">
+            <label>地陪服务态度：</label>
+            <input type="text" name="guide_service" maxlength="1" class="score-input auto-next" pattern="[1-5]">
+        </div>
+        <div class="create-form-row">
+            <label>车辆舒适度：</label>
+            <input type="text" name="vehicle_comfort" maxlength="1" class="score-input auto-next" pattern="[1-5]">
+        </div>
+        <div class="create-form-row">
+            <label>车辆干净程度：</label>
+            <input type="text" name="vehicle_clean" maxlength="1" class="score-input auto-next" pattern="[1-5]">
+        </div>
+        <div class="create-form-row">
+            <label>司机服务：</label>
+            <input type="text" name="driver_service" maxlength="1" class="score-input auto-next" pattern="[1-5]">
+        </div>
+        <div class="create-form-row">
+            <label>餐饮质量：</label>
+            <input type="text" name="food_quality" maxlength="1" class="score-input auto-next" pattern="[1-5]">
+        </div>
+        <div class="create-form-row">
+            <label>餐厅环境：</label>
+            <input type="text" name="restaurant_environment" maxlength="1" class="score-input auto-next" pattern="[1-5]">
+        </div>
+
+        <button type="submit" class="submit-btn">新增</button>
+    </form>
+
+    <h3>旅客问卷列表</h3>
+    <table id="traveler-table-add">
+        <thead>
+        <tr>
+            <th>序号</th>
+            <th>所属团号</th>
+            <th>地陪语言和讲解</th>
+            <th>地陪服务态度</th>
+            <th>车辆舒适度</th>
+            <th>车辆干净程度</th>
+            <th>司机服务</th>
+            <th>餐饮质量</th>
+            <th>餐厅环境</th>
+            <th>操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for idx, t in travelers %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>
+                    <form method="post" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="entity" value="traveler">
+                        <input type="hidden" name="action" value="update">
+                        <input type="hidden" name="index" value="{{ idx }}">
+                        <input type="text" name="group_no" value="{{ t.group_no }}">
+                </td>
+                <td>
+                        <input type="text" name="guide_language" value="{{ t.guide_language }}">
+                </td>
+                <td>
+                        <input type="text" name="guide_service" value="{{ t.guide_service }}">
+                </td>
+                <td>
+                        <input type="text" name="vehicle_comfort" value="{{ t.vehicle_comfort }}">
+                </td>
+                <td>
+                        <input type="text" name="vehicle_clean" value="{{ t.vehicle_clean }}">
+                </td>
+                <td>
+                        <input type="text" name="driver_service" value="{{ t.driver_service }}">
+                </td>
+                <td>
+                        <input type="text" name="food_quality" value="{{ t.food_quality }}">
+                </td>
+                <td>
+                        <input type="text" name="restaurant_environment" value="{{ t.restaurant_environment }}">
+                </td>
+                <td>
+                        <button type="submit" class="submit-btn">保存</button>
+                    </form>
+
+                    <form method="post" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="entity" value="traveler">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="index" value="{{ idx }}">
+                        <button type="submit" class="submit-btn">删除</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="10">暂无旅客问卷数据。</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <div id="traveler-add-pager" class="pager"></div>
+</div>
+
+<script>
+    // 新增旅客问卷时，评分项（1~5）输入一个数字后自动跳到下一个格子
+    (function () {
+        const inputs = Array.from(document.querySelectorAll('.auto-next'));
+        if (!inputs.length) return;
+
+        inputs.forEach((input, index) => {
+            input.addEventListener('input', function () {
+                const v = this.value.trim();
+                // 只接受 1-5 的一个数字
+                if (!/^[1-5]$/.test(v)) {
+                    this.value = '';
+                    return;
+                }
+                // 自动跳到下一个评分格子
+                const next = inputs[index + 1];
+                if (next) {
+                    next.focus();
+                    next.select();
+                }
+            });
+        });
+
+        // 如果是刚刚点击“新增旅客问卷”返回的页面，则自动把光标放到第一个评分格子
+        const shouldFocusTraveler = {{ focus_traveler|yesno:"true,false" }};
+        if (shouldFocusTraveler && inputs.length) {
+            inputs[0].focus();
+            inputs[0].select();
+        }
+    })();
+
+    // 删除团前，提示将一并删除多少条旅客信息
+    (function () {
+        const deleteButtons = document.querySelectorAll('.group-delete-btn');
+        deleteButtons.forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                const count = parseInt(this.getAttribute('data-traveler-count') || '0', 10);
+                let msg;
+                if (count > 0) {
+                    msg = `该团当前共有 ${count} 条旅客问卷记录。\n删除该团将同时删除这 ${count} 条旅客信息。\n是否确认删除？`;
+                } else {
+                    msg = '该团下目前没有旅客问卷记录。\n确认删除该团吗？';
+                }
+                if (!window.confirm(msg)) {
+                    e.preventDefault();
+                }
+            });
+        });
+    })();
+
+    // 简单翻页：团列表和旅客列表，每页 20 条
+    (function () {
+        function setupPager(tableId, pagerId) {
+            const table = document.getElementById(tableId);
+            const pager = document.getElementById(pagerId);
+            if (!table || !pager) return;
+
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const PAGE_SIZE = 20;
+            let currentPage = 1;
+
+            function renderPage() {
+                const total = rows.length;
+                const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+                if (currentPage > totalPages) currentPage = totalPages;
+                const start = (currentPage - 1) * PAGE_SIZE;
+                const end = start + PAGE_SIZE;
+                const pageRows = rows.slice(start, end);
+
+                tbody.innerHTML = '';
+                pageRows.forEach(r => tbody.appendChild(r));
+
+                pager.innerHTML = '';
+                const info = document.createElement('span');
+                info.textContent = `第 ${currentPage} / ${totalPages} 页（共 ${total} 条）`;
+
+                const prev = document.createElement('button');
+                prev.textContent = '上一页';
+                prev.disabled = currentPage <= 1;
+                prev.addEventListener('click', () => {
+                    if (currentPage > 1) {
+                        currentPage -= 1;
+                        renderPage();
+                    }
+                });
+
+                const next = document.createElement('button');
+                next.textContent = '下一页';
+                next.disabled = currentPage >= totalPages;
+                next.addEventListener('click', () => {
+                    if (currentPage < totalPages) {
+                        currentPage += 1;
+                        renderPage();
+                    }
+                });
+
+                pager.appendChild(prev);
+                pager.appendChild(next);
+                pager.appendChild(info);
+            }
+
+            renderPage();
+        }
+
+        setupPager('group-table', 'group-pager');
+        setupPager('traveler-table-add', 'traveler-add-pager');
+    })();
+
+    // 记住滚动位置：点击保存 / 删除 / 新增后返回原位置
+    (function () {
+        const KEY = 'scroll-' + window.location.pathname;
+
+        // 恢复
+        const saved = sessionStorage.getItem(KEY);
+        if (saved) {
+            const y = parseInt(saved, 10);
+            if (!Number.isNaN(y)) {
+                window.scrollTo(0, y);
+            }
+            sessionStorage.removeItem(KEY);
+        }
+
+        // 提交前记录
+        const forms = document.querySelectorAll('form');
+        forms.forEach(f => {
+            f.addEventListener('submit', function () {
+                sessionStorage.setItem(KEY, String(window.scrollY || window.pageYOffset || 0));
+            });
+        });
+    })();
+</script>
+
+</body>
+</html>
+
