@@ -1,80 +1,22 @@
-<!DOCTYPE html>
-<html lang="zh-cn">
-<head>
-    <meta charset="UTF-8">
-    <title>问卷录入</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        h1, h2 {
-            margin-bottom: 10px;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-bottom: 30px;
-        }
-        th, td {
-            border: 1px solid #ccc;
-            padding: 6px 8px;
-            text-align: left;
-            font-size: 14px;
-        }
-        th {
-            background-color: #f5f5f5;
-        }
-        form.inline {
-            display: inline-block;
-            margin: 0;
-        }
-        input[type="text"], input[type="number"] {
-            width: 120px;
-            box-sizing: border-box;
-            font-size: 13px;
-        }
-        .section {
-            border: 1px solid #ddd;
-            padding: 15px;
-            margin-bottom: 30px;
-            border-radius: 4px;
-        }
-        .section-title {
-            font-size: 18px;
-            margin-bottom: 10px;
-        }
-        .create-form-row {
-            margin-bottom: 8px;
-        }
-        .create-form-row label {
-            display: inline-block;
-            width: 130px;
-        }
-        .submit-btn {
-            padding: 4px 10px;
-            font-size: 13px;
-        }
-        .score-input {
-            width: 40px;
-            text-align: center;
-        }
-    </style>
-</head>
-<body>
-
-<div class="section" style="margin-bottom: 15px; border-color: #bbb;">
-    <div class="section-title">问卷管理导航</div>
-    <a href="{% url 'questionnaire_add' %}"
-       style="margin-right: 10px; font-weight: {% if request.resolver_match.url_name == 'questionnaire_add' %}bold{% else %}normal{% endif %};">
-        问卷录入
-    </a>
-    <a href="{% url 'questionnaire_view' %}"
-       style="font-weight: {% if request.resolver_match.url_name == 'questionnaire_view' %}bold{% else %}normal{% endif %};">
-        问卷查看
-    </a>
-</div>
-
+{% extends "base.html" %}
+{% block title %}问卷录入{% endblock %}
+{% block extra_css %}
+table { border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 14px; }
+th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+th { background: var(--side-bg); }
+form.inline { display: inline-block; margin: 0; }
+input[type="text"], input[type="number"], input[type="date"] { width: 120px; box-sizing: border-box; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; }
+.create-form-row { margin-bottom: 8px; }
+.create-form-row label { display: inline-block; width: 130px; }
+.submit-btn { padding: 6px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; border: 1px solid var(--border); background: var(--side-bg); color: var(--text); }
+.submit-btn:hover { background: var(--side-border); }
+.score-input { width: 40px; text-align: center; }
+.pager { margin-top: 10px; }
+.pager button { margin-right: 8px; padding: 4px 10px; }
+.group-delete-btn { background: #dc2626; color: #fff; border-color: #b91c1c; }
+.group-delete-btn:hover { background: #b91c1c; }
+{% endblock %}
+{% block content %}
 <h1>问卷录入</h1>
 
 <div class="section">
@@ -444,7 +386,5 @@
         });
     })();
 </script>
-
-</body>
-</html>
+{% endblock %}
 

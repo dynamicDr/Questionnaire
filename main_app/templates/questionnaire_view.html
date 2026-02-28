@@ -1,178 +1,42 @@
-<!DOCTYPE html>
-<html lang="zh-cn">
-<head>
-    <meta charset="UTF-8">
-    <title>问卷数据查看</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        h1 {
-            margin-bottom: 10px;
-        }
-        .filters {
-            margin-bottom: 15px;
-        }
-        .filters label {
-            margin-right: 10px;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-top: 10px;
-        }
-        th, td {
-            border: 1px solid #ccc;
-            padding: 6px 8px;
-            text-align: left;
-            font-size: 13px;
-        }
-        th {
-            background-color: #f5f5f5;
-            cursor: pointer;
-        }
-        .section {
-            border: 1px solid #ddd;
-            padding: 15px;
-            margin-bottom: 30px;
-            border-radius: 4px;
-        }
-        .section-title {
-            font-size: 18px;
-            margin-bottom: 10px;
-        }
-        .chart-container {
-            width: 100%;
-            max-width: 900px;
-            height: 400px;
-        }
-        .chart-controls {
-            margin-bottom: 10px;
-        }
-        .chart-controls label {
-            margin-right: 8px;
-        }
-        .small-input {
-            width: 160px;
-        }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-
-<div class="section" style="margin-bottom: 15px; border-color: #bbb;">
-    <div class="section-title">问卷管理导航</div>
-    <a href="{% url 'questionnaire_add' %}"
-       style="margin-right: 10px; font-weight: {% if request.resolver_match.url_name == 'questionnaire_add' %}bold{% else %}normal{% endif %};">
-        问卷录入
-    </a>
-    <a href="{% url 'questionnaire_view' %}"
-       style="font-weight: {% if request.resolver_match.url_name == 'questionnaire_view' %}bold{% else %}normal{% endif %};">
-        问卷查看
-    </a>
-</div>
-
+{% extends "base.html" %}
+{% block title %}问卷查看{% endblock %}
+{% block extra_css %}
+.filters { margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.filters label { margin-right: 8px; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 13px; }
+th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+th { background: var(--side-bg); cursor: pointer; user-select: none; }
+th.sortable { position: relative; padding-right: 18px; }
+th.sort-asc::after { content: ' ▲'; font-size: 10px; opacity: 0.8; }
+th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
+.chart-container { width: 100%; max-width: 900px; height: 400px; }
+.small-input { width: 160px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; }
+.pager { margin-top: 10px; }
+.pager button { margin-right: 8px; padding: 4px 10px; }
+{% endblock %}
+{% block head_extra %}<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>{% endblock %}
+{% block content %}
 <h1>问卷查看</h1>
 
 <div class="section">
-    <h2>旅客明细</h2>
-
-    <div class="filters">
-        <label>
-            按团号筛选：
-            <input type="text" id="filter-group" class="small-input" placeholder="输入团号关键字">
-        </label>
-        <label>
-            按地区筛选：
-            <input type="text" id="filter-region" class="small-input" placeholder="输入地区关键字">
-        </label>
-        <label>
-            按地接社筛选：
-            <input type="text" id="filter-agency" class="small-input" placeholder="输入地接社关键字">
-        </label>
-        <label>
-            按酒店筛选：
-            <input type="text" id="filter-hotel" class="small-input" placeholder="输入酒店关键字">
-        </label>
-        <label>
-            开始日期 从：
-            <input type="date" id="filter-start-from" class="small-input">
-        </label>
-        <label>
-            到：
-            <input type="date" id="filter-start-to" class="small-input">
-        </label>
-    </div>
-
-    <table id="traveler-table">
-        <thead>
-        <tr>
-            <th data-key="group_no">团号</th>
-            <th data-key="region">地区</th>
-            <th data-key="agency">地接社</th>
-            <th data-key="hotel">酒店</th>
-            <th data-key="start_date">开始日期</th>
-            <th data-key="end_date">截止日期</th>
-            <th data-key="guide_language">地陪语言和讲解</th>
-            <th data-key="guide_service">地陪服务态度</th>
-            <th data-key="vehicle_comfort">车辆舒适度</th>
-            <th data-key="vehicle_clean">车辆干净程度</th>
-            <th data-key="driver_service">司机服务</th>
-            <th data-key="food_quality">餐饮质量</th>
-            <th data-key="restaurant_environment">餐厅环境</th>
-            <th data-key="total_score">总分</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for t in travelers %}
-            <tr>
-                <td>{{ t.group_no }}</td>
-                <td>{{ t.region }}</td>
-                <td>{{ t.agency }}</td>
-                <td>{{ t.hotel }}</td>
-                <td>{{ t.start_date }}</td>
-                <td>{{ t.end_date }}</td>
-                <td>{{ t.guide_language }}</td>
-                <td>{{ t.guide_service }}</td>
-                <td>{{ t.vehicle_comfort }}</td>
-                <td>{{ t.vehicle_clean }}</td>
-                <td>{{ t.driver_service }}</td>
-                <td>{{ t.food_quality }}</td>
-                <td>{{ t.restaurant_environment }}</td>
-                <td>
-                    {{ t.guide_language|default:"0"|add:t.guide_service|default:"0"|add:t.vehicle_comfort|default:"0"|add:t.vehicle_clean|default:"0"|add:t.driver_service|default:"0"|add:t.food_quality|default:"0"|add:t.restaurant_environment|default:"0" }}
-                </td>
-            </tr>
-        {% empty %}
-            <tr>
-                <td colspan="10">暂无旅客数据。</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    <div id="traveler-pager" class="pager"></div>
-</div>
-
-<div class="section">
-    <h2>多团统计</h2>
+    <h2>统计</h2>
 
     <div class="filters" style="margin-bottom: 10px;">
         <label>
             按团号筛选：
-            <input type="text" id="group-filter-group-no" class="small-input" placeholder="团号关键字">
+            <input type="text" id="group-filter-group-no" class="small-input" >
         </label>
         <label>
             按地区筛选：
-            <input type="text" id="group-filter-region" class="small-input" placeholder="地区关键字">
+            <input type="text" id="group-filter-region" class="small-input" >
         </label>
         <label>
             按地接社筛选：
-            <input type="text" id="group-filter-agency" class="small-input" placeholder="地接社关键字">
+            <input type="text" id="group-filter-agency" class="small-input" >
         </label>
         <label>
             按酒店筛选：
-            <input type="text" id="group-filter-hotel" class="small-input" placeholder="酒店关键字">
+            <input type="text" id="group-filter-hotel" class="small-input" >
         </label>
         <br>
         <label>
@@ -202,23 +66,22 @@
     <table id="group-stats-table">
         <thead>
         <tr>
-            <th>展示在图表中</th>
-            <th>团号</th>
+            <th data-key="group_select">展示在图表中</th>
+            <th data-key="group_no">团号</th>
             <th data-key="region">地区</th>
             <th data-key="agency">地接社</th>
             <th data-key="hotel">酒店</th>
             <th data-key="start_date">开始日期</th>
             <th data-key="end_date">截止日期</th>
-            <th>回收率</th>
-            <th data-key="guide_language_mean">地陪语言平均</th>
-            <th data-key="guide_service_mean">服务态度平均</th>
-            <th data-key="vehicle_comfort_mean">车辆舒适度平均</th>
-            <th data-key="vehicle_clean_mean">车辆干净平均</th>
-            <th data-key="driver_service_mean">司机服务平均</th>
-            <th data-key="food_quality_mean">餐饮质量平均</th>
-            <th data-key="restaurant_environment_mean">餐厅环境平均</th>
-            <th data-key="total_mean">总分平均</th>
-            <th data-key="total_std">总分标准差</th>
+            <th data-key="feedback_rate">回收率</th>
+            <th data-key="guide_language_mean">地陪语言</th>
+            <th data-key="guide_service_mean">服务态度</th>
+            <th data-key="vehicle_comfort_mean">车辆舒适度</th>
+            <th data-key="vehicle_clean_mean">车辆干净</th>
+            <th data-key="driver_service_mean">司机服务</th>
+            <th data-key="food_quality_mean">餐饮质量</th>
+            <th data-key="restaurant_environment_mean">餐厅环境</th>
+            <th data-key="total_mean">综合得分</th>
         </tr>
         </thead>
         <tbody>
@@ -245,11 +108,10 @@
                 <td>{{ g.food_quality_mean }}</td>
                 <td>{{ g.restaurant_environment_mean }}</td>
                 <td>{{ g.total_mean }}</td>
-                <td>{{ g.total_std }}</td>
             </tr>
         {% empty %}
             <tr>
-                <td colspan="7">暂无团数据。</td>
+                <td colspan="16">暂无团数据。</td>
             </tr>
         {% endfor %}
         </tbody>
@@ -261,6 +123,63 @@
     <div class="chart-container">
         <canvas id="stat-chart"></canvas>
     </div>
+</div>
+
+<div class="section">
+    <h2>问卷明细</h2>
+
+    <div class="filters">
+        <label>按团号筛选：<input type="text" id="filter-group" class="small-input"></label>
+        <label>按地区筛选：<input type="text" id="filter-region" class="small-input"></label>
+        <label>按地接社筛选：<input type="text" id="filter-agency" class="small-input"></label>
+        <label>按酒店筛选：<input type="text" id="filter-hotel" class="small-input"></label>
+        <label>开始日期 从：<input type="date" id="filter-start-from" class="small-input"></label>
+        <label>到：<input type="date" id="filter-start-to" class="small-input"></label>
+    </div>
+
+    <table id="traveler-table">
+        <thead>
+        <tr>
+            <th data-key="group_no">团号</th>
+            <th data-key="region">地区</th>
+            <th data-key="agency">地接社</th>
+            <th data-key="hotel">酒店</th>
+            <th data-key="start_date">开始日期</th>
+            <th data-key="end_date">截止日期</th>
+            <th data-key="guide_language">地陪语言和讲解</th>
+            <th data-key="guide_service">地陪服务态度</th>
+            <th data-key="vehicle_comfort">车辆舒适度</th>
+            <th data-key="vehicle_clean">车辆干净程度</th>
+            <th data-key="driver_service">司机服务</th>
+            <th data-key="food_quality">餐饮质量</th>
+            <th data-key="restaurant_environment">餐厅环境</th>
+            <th data-key="total_score">综合得分</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for t in travelers %}
+            <tr>
+                <td>{{ t.group_no }}</td>
+                <td>{{ t.region }}</td>
+                <td>{{ t.agency }}</td>
+                <td>{{ t.hotel }}</td>
+                <td>{{ t.start_date }}</td>
+                <td>{{ t.end_date }}</td>
+                <td>{{ t.guide_language }}</td>
+                <td>{{ t.guide_service }}</td>
+                <td>{{ t.vehicle_comfort }}</td>
+                <td>{{ t.vehicle_clean }}</td>
+                <td>{{ t.driver_service }}</td>
+                <td>{{ t.food_quality }}</td>
+                <td>{{ t.restaurant_environment }}</td>
+                <td>{{ t.composite_score }}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="14">暂无旅客数据。</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <div id="traveler-pager" class="pager"></div>
 </div>
 
 <script>
@@ -386,6 +305,7 @@
 
             currentFiltered = filteredRows;
             currentPage = 1;
+            updateSortArrows();
             renderPage();
         }
 
@@ -397,6 +317,15 @@
         if (filterStartTo) filterStartTo.addEventListener('change', applyFilterAndSort);
         if (filterEndFrom) filterEndFrom.addEventListener('change', applyFilterAndSort);
         if (filterEndTo) filterEndTo.addEventListener('change', applyFilterAndSort);
+
+        function updateSortArrows() {
+            table.querySelectorAll('thead th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.dataset.key === currentSortKey) {
+                    th.classList.add(currentSortAsc ? 'sort-asc' : 'sort-desc');
+                }
+            });
+        }
 
         const ths = table.querySelectorAll('thead th');
         ths.forEach(th => {
@@ -433,6 +362,15 @@
         const filterStartFrom = document.getElementById('group-filter-start-from');
         const filterStartTo = document.getElementById('group-filter-start-to');
         const filterClearBtn = document.getElementById('group-filter-clear');
+
+        function updateSortArrows() {
+            table.querySelectorAll('thead th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.dataset.key === currentSortKey) {
+                    th.classList.add(currentSortAsc ? 'sort-asc' : 'sort-desc');
+                }
+            });
+        }
 
         const PAGE_SIZE = 20;
         let currentSortKey = null;
@@ -528,11 +466,16 @@
                 const ths = table.querySelectorAll('thead th');
                 let colIndex = 0;
                 ths.forEach((th, idx) => {
-                    if (th.dataset.key === currentSortKey) {
-                        colIndex = idx;
-                    }
+                    if (th.dataset.key === currentSortKey) colIndex = idx;
                 });
                 filtered.sort((a, b) => {
+                    if (currentSortKey === 'group_select') {
+                        const cbA = a.children[colIndex].querySelector('.group-select');
+                        const cbB = b.children[colIndex].querySelector('.group-select');
+                        const va = cbA && cbA.checked ? 1 : 0;
+                        const vb = cbB && cbB.checked ? 1 : 0;
+                        return currentSortAsc ? va - vb : vb - va;
+                    }
                     const av = (a.children[colIndex].innerText || '').trim();
                     const bv = (b.children[colIndex].innerText || '').trim();
                     const an = parseFloat(av.replace('%', ''));
@@ -547,6 +490,7 @@
                 });
             }
 
+            updateSortArrows();
             currentFiltered = filtered;
             currentPage = 1;
             renderPage();
@@ -610,7 +554,7 @@
             {key: 'driver_service', label: '司机服务'},
             {key: 'food_quality', label: '餐饮质量'},
             {key: 'restaurant_environment', label: '餐厅环境'},
-            {key: 'total', label: '总分'},
+            {key: 'total', label: '综合得分'},
         ];
 
         const metricLabels = metricDefs.map(m => m.label);
@@ -638,51 +582,18 @@
 
                 const color = colors[idx % colors.length];
                 const means = [];
-                const plusStd = [];
-                const minusStd = [];
 
                 metricDefs.forEach(m => {
                     if (m.key === 'total') {
-                        const mean = info.total.mean || 0;
-                        const std = info.total.std || 0;
-                        means.push(mean);
-                        plusStd.push(mean + std);
-                        minusStd.push(mean - std);
+                        means.push(info.total.mean || 0);
                     } else {
-                        const metricInfo = (info.metrics && info.metrics[m.key]) || {mean: 0, std: 0};
-                        const mean = metricInfo.mean || 0;
-                        const std = metricInfo.std || 0;
-                        means.push(mean);
-                        plusStd.push(mean + std);
-                        minusStd.push(mean - std);
+                        const metricInfo = (info.metrics && info.metrics[m.key]) || {mean: 0};
+                        means.push(metricInfo.mean || 0);
                     }
                 });
 
-                // 上界（不可见线）
                 datasets.push({
-                    label: gno + ' 上界',
-                    data: plusStd,
-                    borderColor: 'rgba(' + color + ', 0)',
-                    backgroundColor: 'rgba(' + color + ', 0)',
-                    pointRadius: 0,
-                    borderWidth: 0,
-                    fill: false,
-                });
-
-                // 阴影区域（下界，向上填充到上界）
-                datasets.push({
-                    label: gno + ' 区间',
-                    data: minusStd,
-                    borderColor: 'rgba(' + color + ', 0)',
-                    backgroundColor: 'rgba(' + color + ', 0.15)',
-                    pointRadius: 0,
-                    borderWidth: 0,
-                    fill: '-1',
-                });
-
-                // 平均分折线
-                datasets.push({
-                    label: gno + ' 平均分',
+                    label: gno,
                     data: means,
                     borderColor: 'rgba(' + color + ', 1)',
                     backgroundColor: 'rgba(' + color + ', 0.6)',
@@ -713,16 +624,7 @@
                             beginAtZero: true
                         }
                     },
-                    plugins: {
-                        legend: {
-                            labels: {
-                                filter: function (item) {
-                                    const text = item.text || '';
-                                    return !/上界|区间/.test(text);
-                                }
-                            }
-                        }
-                    }
+                    plugins: { legend: {} }
                 }
             });
         }
@@ -767,7 +669,5 @@
         window.renderGroupChart = renderChart;
     })();
 </script>
-
-</body>
-</html>
+{% endblock %}
 

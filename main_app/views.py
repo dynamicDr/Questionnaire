@@ -103,18 +103,21 @@ def questionnaire(request):
                 except ValueError:
                     pass
 
-                new_group = {
-                    'group_no': request.POST.get('group_no', '').strip(),
-                    'agency': request.POST.get('agency', '').strip(),
-                    'hotel': request.POST.get('hotel', '').strip(),
-                    'region': request.POST.get('region', '').strip(),
-                    'people_count': people_count,
-                    'feedback_count': feedback_count,
-                    'feedback_rate': feedback_rate,
-                    'start_date': request.POST.get('start_date', '').strip(),
-                    'end_date': request.POST.get('end_date', '').strip(),
-                }
-                groups.append(new_group)
+                new_group_no = request.POST.get('group_no', '').strip()
+                existing_nos = {(g.get('group_no') or '').strip() for g in groups if (g.get('group_no') or '').strip()}
+                if new_group_no and new_group_no not in existing_nos:
+                    new_group = {
+                        'group_no': new_group_no,
+                        'agency': request.POST.get('agency', '').strip(),
+                        'hotel': request.POST.get('hotel', '').strip(),
+                        'region': request.POST.get('region', '').strip(),
+                        'people_count': people_count,
+                        'feedback_count': feedback_count,
+                        'feedback_rate': feedback_rate,
+                        'start_date': request.POST.get('start_date', '').strip(),
+                        'end_date': request.POST.get('end_date', '').strip(),
+                    }
+                    groups.append(new_group)
 
             elif action in ('update', 'delete') and index_str is not None:
                 try:
@@ -132,17 +135,20 @@ def questionnaire(request):
                             except ValueError:
                                 pass
 
-                            groups[idx] = {
-                                'group_no': request.POST.get('group_no', '').strip(),
-                                'agency': request.POST.get('agency', '').strip(),
-                                'hotel': request.POST.get('hotel', '').strip(),
-                                'region': request.POST.get('region', '').strip(),
-                                'people_count': people_count,
-                                'feedback_count': feedback_count,
-                                'feedback_rate': feedback_rate,
-                                'start_date': request.POST.get('start_date', '').strip(),
-                                'end_date': request.POST.get('end_date', '').strip(),
-                            }
+                            new_group_no = request.POST.get('group_no', '').strip()
+                            existing_nos = {(g.get('group_no') or '').strip() for i, g in enumerate(groups) if i != idx and (g.get('group_no') or '').strip()}
+                            if new_group_no and new_group_no not in existing_nos:
+                                groups[idx] = {
+                                    'group_no': new_group_no,
+                                    'agency': request.POST.get('agency', '').strip(),
+                                    'hotel': request.POST.get('hotel', '').strip(),
+                                    'region': request.POST.get('region', '').strip(),
+                                    'people_count': people_count,
+                                    'feedback_count': feedback_count,
+                                    'feedback_rate': feedback_rate,
+                                    'start_date': request.POST.get('start_date', '').strip(),
+                                    'end_date': request.POST.get('end_date', '').strip(),
+                                }
                         elif action == 'delete':
                             # 记录被删团的团号，用于同步删除旅客表中的对应记录
                             deleted_group_no = groups[idx].get('group_no', '').strip()
@@ -236,10 +242,22 @@ def questionnaire_view(request):
         if key:
             group_map[key] = g
 
+    METRIC_KEYS = ['guide_language', 'guide_service', 'vehicle_comfort', 'vehicle_clean', 'driver_service', 'food_quality', 'restaurant_environment']
     enriched_travelers = []
     for t in travelers:
         group_no = (t.get('group_no') or '').strip()
         g = group_map.get(group_no, {})
+        s = 0.0
+        valid = False
+        for k in METRIC_KEYS:
+            try:
+                v = float(t.get(k) or 0)
+            except ValueError:
+                v = 0
+            if v:
+                valid = True
+            s += v
+        composite_score = round(s / len(METRIC_KEYS), 2) if valid else 0.0
         enriched_travelers.append({
             'group_no': group_no,
             'region': g.get('region', ''),
@@ -254,6 +272,7 @@ def questionnaire_view(request):
             'driver_service': t.get('driver_service', ''),
             'food_quality': t.get('food_quality', ''),
             'restaurant_environment': t.get('restaurant_environment', ''),
+            'composite_score': composite_score,
         })
 
     def _calc_mean_std(values):
@@ -303,7 +322,7 @@ def questionnaire_view(request):
                 'std': std_v,
             }
 
-        # 总分
+        # 综合得分 = 总分 / 小项数（7 项）
         total_vals = []
         for t in group_travelers:
             s = 0.0
@@ -317,12 +336,12 @@ def questionnaire_view(request):
                     valid = True
                 s += v
             if valid:
-                total_vals.append(s)
+                total_vals.append(s / len(metric_defs))  # 综合得分
         total_mean, total_std = _calc_mean_std(total_vals)
 
         feedback_rate = base_info.get('feedback_rate', '')
 
-        # 团列表展示：基础信息 + 各小项平均分 + 总分统计
+        # 团列表展示：基础信息 + 各小项平均分 + 综合得分
         group_entry = {
             'group_no': gno,
             'region': base_info.get('region', ''),
@@ -335,7 +354,7 @@ def questionnaire_view(request):
             'total_std': total_std,
         }
 
-        # 将每个小项的平均分也放进 group_stats，方便模板直接展示
+        # 将每个小项的平均分放进 group_stats，方便模板直接展示
         for key, _label in metric_defs:
             metric_info = metrics_for_group.get(key, {})
             group_entry[f'{key}_mean'] = metric_info.get('mean', 0.0)
@@ -348,7 +367,7 @@ def questionnaire_view(request):
             'feedback_rate': feedback_rate,
             'metrics': metrics_for_group,
             'total': {
-                'label': '总分',
+                'label': '综合得分',
                 'mean': total_mean,
                 'std': total_std,
             },
