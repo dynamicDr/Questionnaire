@@ -595,13 +595,17 @@ def view_data_api(request):
         kw_hotel = (request.GET.get('hotel', '') or '').strip().lower()
         start_from = request.GET.get('start_from', '')
         start_to = request.GET.get('start_to', '')
+        end_from = request.GET.get('end_from', '')
+        end_to = request.GET.get('end_to', '')
         rows = [r for r in rows if
             (not kw_group or (r.get('group_no') or '').lower().find(kw_group) >= 0) and
             (not kw_region or (r.get('region') or '').lower().find(kw_region) >= 0) and
             (not kw_agency or (r.get('agency') or '').lower().find(kw_agency) >= 0) and
             (not kw_hotel or (r.get('hotel') or '').lower().find(kw_hotel) >= 0) and
             (not start_from or (r.get('start_date') or '') >= start_from) and
-            (not start_to or (r.get('start_date') or '') <= start_to)
+            (not start_to or (r.get('start_date') or '') <= start_to) and
+            (not end_from or (r.get('end_date') or '') >= end_from) and
+            (not end_to or (r.get('end_date') or '') <= end_to)
         ]
         sort_col_map = {
             'group_no': 'group_no', 'region': 'region', 'agency': 'agency', 'hotel': 'hotel',

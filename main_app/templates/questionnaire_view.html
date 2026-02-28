@@ -11,6 +11,13 @@ th.sort-asc::after { content: ' ▲'; font-size: 10px; opacity: 0.8; }
 th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
 .chart-container { width: 100%; max-width: 900px; height: 400px; }
 .small-input { width: 160px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; }
+.date-input-wrap { position: relative; display: inline-block; }
+.date-input-wrap .date-placeholder { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #888; font-size: 13px; }
+.date-input-wrap.filled .date-placeholder,
+.date-input-wrap.focused .date-placeholder { visibility: hidden; }
+.date-input-wrap:not(.filled):not(.focused) input { color: transparent; }
+.date-input-wrap.filled input,
+.date-input-wrap.focused input { color: inherit; }
 .pager { margin-top: 10px; }
 .pager button { margin-right: 8px; padding: 4px 10px; }
 {% endblock %}
@@ -38,23 +45,22 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
             按酒店筛选：
             <input type="text" id="group-filter-hotel" class="small-input" >
         </label>
-        <br>
-        
+        <span style="flex-basis: 100%; height: 0; display: block;"></span>
         <label>
             开始日期 从：
-            <input type="date" id="group-filter-start-from" class="small-input">
+            <span class="date-input-wrap"><input type="date" id="group-filter-start-from" class="small-input"><span class="date-placeholder">不限</span></span>
         </label>
         <label>
             到：
-            <input type="date" id="group-filter-start-to" class="small-input">
+            <span class="date-input-wrap"><input type="date" id="group-filter-start-to" class="small-input"><span class="date-placeholder">不限</span></span>
         </label>
         <label>
             截止日期 从：
-            <input type="date" id="group-filter-end-from" class="small-input">
+            <span class="date-input-wrap"><input type="date" id="group-filter-end-from" class="small-input"><span class="date-placeholder">不限</span></span>
         </label>
         <label>
             到：
-            <input type="date" id="group-filter-end-to" class="small-input">
+            <span class="date-input-wrap"><input type="date" id="group-filter-end-to" class="small-input"><span class="date-placeholder">不限</span></span>
         </label>
         <button type="button" id="group-filter-clear">清除所有条件</button>
     </div>
@@ -104,10 +110,10 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         <label> 查看平均分数</label>
     </p>
     <div class="filters" style="margin-bottom: 10px;">
-        <label>开始日期 从：<input type="date" id="group-by-start-from" class="small-input"></label>
-        <label>到：<input type="date" id="group-by-start-to" class="small-input"></label>
-        <label>截止日期 从：<input type="date" id="group-by-end-from" class="small-input"></label>
-        <label>到：<input type="date" id="group-by-end-to" class="small-input"></label>
+        <label>开始日期 从：<span class="date-input-wrap"><input type="date" id="group-by-start-from" class="small-input"><span class="date-placeholder">不限</span></span></label>
+        <label>到：<span class="date-input-wrap"><input type="date" id="group-by-start-to" class="small-input"><span class="date-placeholder">不限</span></span></label>
+        <label>截止日期 从：<span class="date-input-wrap"><input type="date" id="group-by-end-from" class="small-input"><span class="date-placeholder">不限</span></span></label>
+        <label>到：<span class="date-input-wrap"><input type="date" id="group-by-end-to" class="small-input"><span class="date-placeholder">不限</span></span></label>
         <button type="button" id="group-by-filter-clear">清除所有条件</button>
     </div>
     <table id="group-by-table">
@@ -140,8 +146,8 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         <label>按地区筛选：<input type="text" id="filter-region" class="small-input"></label>
         <label>按地接社筛选：<input type="text" id="filter-agency" class="small-input"></label>
         <label>按酒店筛选：<input type="text" id="filter-hotel" class="small-input"></label>
-        <label>开始日期 从：<input type="date" id="filter-start-from" class="small-input"></label>
-        <label>到：<input type="date" id="filter-start-to" class="small-input"></label>
+        <label>开始日期 从：<span class="date-input-wrap"><input type="date" id="filter-start-from" class="small-input"><span class="date-placeholder">不限</span></span></label>
+        <label>到：<span class="date-input-wrap"><input type="date" id="filter-start-to" class="small-input"><span class="date-placeholder">不限</span></span></label>
     </div>
 
     <table id="traveler-table">
@@ -191,6 +197,8 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         const filterHotel = document.getElementById('group-filter-hotel');
         const filterStartFrom = document.getElementById('group-filter-start-from');
         const filterStartTo = document.getElementById('group-filter-start-to');
+        const filterEndFrom = document.getElementById('group-filter-end-from');
+        const filterEndTo = document.getElementById('group-filter-end-to');
         const filterClearBtn = document.getElementById('group-filter-clear');
         let currentSortKey = null;
         let currentSortAsc = true;
@@ -204,6 +212,8 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
             if (filterHotel && filterHotel.value) p.hotel = filterHotel.value;
             if (filterStartFrom && filterStartFrom.value) p.start_from = filterStartFrom.value;
             if (filterStartTo && filterStartTo.value) p.start_to = filterStartTo.value;
+            if (filterEndFrom && filterEndFrom.value) p.end_from = filterEndFrom.value;
+            if (filterEndTo && filterEndTo.value) p.end_to = filterEndTo.value;
             if (currentSortKey) p.sort = currentSortKey;
             p.order = currentSortAsc ? 'asc' : 'desc';
             return p;
@@ -253,7 +263,7 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         }
 
         function onFilter() { currentPage = 1; load(); }
-        [filterGroupNo, filterRegion, filterAgency, filterHotel, filterStartFrom, filterStartTo].forEach(el => {
+        [filterGroupNo, filterRegion, filterAgency, filterHotel, filterStartFrom, filterStartTo, filterEndFrom, filterEndTo].forEach(el => {
             if (el) { el.addEventListener('input', onFilter); if (el.type === 'date') el.addEventListener('change', onFilter); }
         });
         if (filterClearBtn) filterClearBtn.addEventListener('click', () => {
@@ -263,6 +273,9 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
             if (filterHotel) filterHotel.value = '';
             if (filterStartFrom) filterStartFrom.value = '';
             if (filterStartTo) filterStartTo.value = '';
+            if (filterEndFrom) filterEndFrom.value = '';
+            if (filterEndTo) filterEndTo.value = '';
+            if (window.updateDatePlaceholders) window.updateDatePlaceholders();
             onFilter();
         });
 
@@ -432,6 +445,7 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
             if (filterStartTo) filterStartTo.value = '';
             if (filterEndFrom) filterEndFrom.value = '';
             if (filterEndTo) filterEndTo.value = '';
+            if (window.updateDatePlaceholders) window.updateDatePlaceholders();
             load();
         });
 
@@ -445,6 +459,26 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
                 load();
             });
         });
+    })();
+
+    // 日期框未填写且未聚焦时显示「不限」
+    (function () {
+        function updateWrap(wrap) {
+            var inp = wrap.querySelector('input');
+            if (inp && inp.value) wrap.classList.add('filled'); else wrap.classList.remove('filled');
+        }
+        document.querySelectorAll('.date-input-wrap').forEach(function (wrap) {
+            var inp = wrap.querySelector('input');
+            if (!inp) return;
+            updateWrap(wrap);
+            inp.addEventListener('focus', function () { wrap.classList.add('focused'); });
+            inp.addEventListener('blur', function () { wrap.classList.remove('focused'); updateWrap(wrap); });
+            inp.addEventListener('input', function () { updateWrap(wrap); });
+            inp.addEventListener('change', function () { updateWrap(wrap); });
+        });
+        window.updateDatePlaceholders = function () {
+            document.querySelectorAll('.date-input-wrap').forEach(updateWrap);
+        };
     })();
 </script>
 {% endblock %}
