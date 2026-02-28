@@ -14,12 +14,12 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
 .pager { margin-top: 10px; }
 .pager button { margin-right: 8px; padding: 4px 10px; }
 {% endblock %}
-{% block head_extra %}<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>{% endblock %}
+{% block head_extra %}{# Chart.js 暂注释 #}{% endblock %}
 {% block content %}
 <h1>问卷查看</h1>
 
 <div class="section">
-    <h2>统计</h2>
+    <h2>各团数据</h2>
 
     <div class="filters" style="margin-bottom: 10px;">
         <label>
@@ -39,6 +39,7 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
             <input type="text" id="group-filter-hotel" class="small-input" >
         </label>
         <br>
+        
         <label>
             开始日期 从：
             <input type="date" id="group-filter-start-from" class="small-input">
@@ -59,14 +60,9 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
     </div>
 
     <h3>团列表</h3>
-    <p>
-        <button type="button" id="group-select-all">全选</button>
-        <button type="button" id="group-select-none">全不选</button>
-    </p>
     <table id="group-stats-table">
         <thead>
         <tr>
-            <th data-key="group_select">展示在图表中</th>
             <th data-key="group_no">团号</th>
             <th data-key="region">地区</th>
             <th data-key="agency">地接社</th>
@@ -85,46 +81,57 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         </tr>
         </thead>
         <tbody>
-        {% for g in group_stats %}
-            <tr>
-                <td>
-                    <input type="checkbox"
-                           class="group-select"
-                           data-group-no="{{ g.group_no }}"
-                           checked>
-                </td>
-                <td>{{ g.group_no }}</td>
-                <td>{{ g.region }}</td>
-                <td>{{ g.agency }}</td>
-                <td>{{ g.hotel }}</td>
-                <td>{{ g.start_date }}</td>
-                <td>{{ g.end_date }}</td>
-                <td>{{ g.feedback_rate }}</td>
-                <td>{{ g.guide_language_mean }}</td>
-                <td>{{ g.guide_service_mean }}</td>
-                <td>{{ g.vehicle_comfort_mean }}</td>
-                <td>{{ g.vehicle_clean_mean }}</td>
-                <td>{{ g.driver_service_mean }}</td>
-                <td>{{ g.food_quality_mean }}</td>
-                <td>{{ g.restaurant_environment_mean }}</td>
-                <td>{{ g.total_mean }}</td>
-            </tr>
-        {% empty %}
-            <tr>
-                <td colspan="16">暂无团数据。</td>
-            </tr>
-        {% endfor %}
+        <tr><td colspan="15" class="loading">加载中...</td></tr>
         </tbody>
     </table>
     <div id="group-stats-pager" class="pager"></div>
 
+    {% comment %}折线图暂注释
     <h3>多团折线图</h3>
-
-    <div class="chart-container">
-        <canvas id="stat-chart"></canvas>
-    </div>
+    <div class="chart-container"><canvas id="stat-chart"></canvas></div>
+    {% endcomment %}
 </div>
 
+<div class="section">
+    <h2>分组统计</h2>
+    <p>
+        <label>按 </label>
+        <select id="group-by-select">
+            <option value="agency">地接社</option>
+            <option value="region">地区</option>
+            <option value="hotel">酒店</option>
+        </select>
+        <label> 查看平均分数</label>
+    </p>
+    <div class="filters" style="margin-bottom: 10px;">
+        <label>开始日期 从：<input type="date" id="group-by-start-from" class="small-input"></label>
+        <label>到：<input type="date" id="group-by-start-to" class="small-input"></label>
+        <label>截止日期 从：<input type="date" id="group-by-end-from" class="small-input"></label>
+        <label>到：<input type="date" id="group-by-end-to" class="small-input"></label>
+        <button type="button" id="group-by-filter-clear">清除所有条件</button>
+    </div>
+    <table id="group-by-table">
+        <thead>
+        <tr>
+            <th data-key="key">分组</th>
+            <th data-key="count">团数量</th>
+            <th data-key="avg_composite">综合得分均</th>
+            <th data-key="guide_language_mean">地陪语言</th>
+            <th data-key="guide_service_mean">服务态度</th>
+            <th data-key="vehicle_comfort_mean">车辆舒适度</th>
+            <th data-key="vehicle_clean_mean">车辆干净</th>
+            <th data-key="driver_service_mean">司机服务</th>
+            <th data-key="food_quality_mean">餐饮质量</th>
+            <th data-key="restaurant_environment_mean">餐厅环境</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr><td colspan="10" class="loading">加载中...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+{% comment %}问卷明细暂注释
 <div class="section">
     <h2>问卷明细</h2>
 
@@ -157,204 +164,27 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         </tr>
         </thead>
         <tbody>
-        {% for t in travelers %}
-            <tr>
-                <td>{{ t.group_no }}</td>
-                <td>{{ t.region }}</td>
-                <td>{{ t.agency }}</td>
-                <td>{{ t.hotel }}</td>
-                <td>{{ t.start_date }}</td>
-                <td>{{ t.end_date }}</td>
-                <td>{{ t.guide_language }}</td>
-                <td>{{ t.guide_service }}</td>
-                <td>{{ t.vehicle_comfort }}</td>
-                <td>{{ t.vehicle_clean }}</td>
-                <td>{{ t.driver_service }}</td>
-                <td>{{ t.food_quality }}</td>
-                <td>{{ t.restaurant_environment }}</td>
-                <td>{{ t.composite_score }}</td>
-            </tr>
-        {% empty %}
-            <tr><td colspan="14">暂无旅客数据。</td></tr>
-        {% endfor %}
+        <tr><td colspan="14" class="loading">加载中...</td></tr>
         </tbody>
     </table>
     <div id="traveler-pager" class="pager"></div>
 </div>
+{% endcomment %}
 
 <script>
-    // 原始数据（后端注入的 JSON）
-    const travelersData = {{ travelers_json|safe }};
-    const chartStats = {{ chart_stats_json|safe }};
+    const API_URL = '{% url "view_data_api" %}';
+    const PAGE_SIZE = 20;
 
-    // 旅客明细：筛选 + 排序 + 翻页
-    (function () {
-        const table = document.getElementById('traveler-table');
-        const tbody = table.querySelector('tbody');
-        const rows = Array.from(tbody.querySelectorAll('tr'));
-        const filterGroup = document.getElementById('filter-group');
-        const filterRegion = document.getElementById('filter-region');
-        const filterAgency = document.getElementById('filter-agency');
-        const filterHotel = document.getElementById('filter-hotel');
-        const filterStartFrom = document.getElementById('filter-start-from');
-        const filterStartTo = document.getElementById('filter-start-to');
-        const filterEndFrom = document.getElementById('filter-end-from');
-        const filterEndTo = document.getElementById('filter-end-to');
-        const pager = document.getElementById('traveler-pager');
+    function fetchApi(params) {
+        const qs = new URLSearchParams(params).toString();
+        return fetch(API_URL + '?' + qs).then(r => r.json());
+    }
 
-        const PAGE_SIZE = 20;
-        let currentSortKey = null;
-        let currentSortAsc = true;
-        let currentPage = 1;
-        let currentFiltered = rows.slice();
-
-        function renderPage() {
-            const total = currentFiltered.length;
-            const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-            if (currentPage > totalPages) currentPage = totalPages;
-            const start = (currentPage - 1) * PAGE_SIZE;
-            const end = start + PAGE_SIZE;
-            const pageRows = currentFiltered.slice(start, end);
-
-            tbody.innerHTML = '';
-            pageRows.forEach(r => tbody.appendChild(r));
-
-            if (pager) {
-                pager.innerHTML = '';
-                const info = document.createElement('span');
-                info.textContent = `第 ${currentPage} / ${totalPages} 页（共 ${total} 条）`;
-
-                const prev = document.createElement('button');
-                prev.textContent = '上一页';
-                prev.disabled = currentPage <= 1;
-                prev.addEventListener('click', () => {
-                    if (currentPage > 1) {
-                        currentPage -= 1;
-                        renderPage();
-                    }
-                });
-
-                const next = document.createElement('button');
-                next.textContent = '下一页';
-                next.disabled = currentPage >= totalPages;
-                next.addEventListener('click', () => {
-                    if (currentPage < totalPages) {
-                        currentPage += 1;
-                        renderPage();
-                    }
-                });
-
-                pager.appendChild(prev);
-                pager.appendChild(next);
-                pager.appendChild(info);
-            }
-        }
-
-        function applyFilterAndSort() {
-            const groupKeyword = filterGroup.value.trim().toLowerCase();
-            const regionKeyword = filterRegion.value.trim().toLowerCase();
-            const agencyKeyword = filterAgency ? filterAgency.value.trim().toLowerCase() : '';
-            const hotelKeyword = filterHotel ? filterHotel.value.trim().toLowerCase() : '';
-            const startFrom = filterStartFrom ? filterStartFrom.value : '';
-            const startTo = filterStartTo ? filterStartTo.value : '';
-            const endFrom = filterEndFrom ? filterEndFrom.value : '';
-            const endTo = filterEndTo ? filterEndTo.value : '';
-
-            let filteredRows = rows.filter(row => {
-                const cells = row.querySelectorAll('td');
-                if (!cells.length) return true; // 空行（暂无数据）
-                const groupText = (cells[0].innerText || '').toLowerCase();
-                const regionText = (cells[1].innerText || '').toLowerCase();
-                const agencyText = (cells[2].innerText || '').toLowerCase();
-                const hotelText = (cells[3].innerText || '').toLowerCase();
-                const startDateText = (cells[4].innerText || '').trim();
-                const endDateText = (cells[5].innerText || '').trim();
-                if (groupKeyword && !groupText.includes(groupKeyword)) return false;
-                if (regionKeyword && !regionText.includes(regionKeyword)) return false;
-                if (agencyKeyword && !agencyText.includes(agencyKeyword)) return false;
-                if (hotelKeyword && !hotelText.includes(hotelKeyword)) return false;
-                if (startFrom && startDateText && startDateText < startFrom) return false;
-                if (startTo && startDateText && startDateText > startTo) return false;
-                if (endFrom && endDateText && endDateText < endFrom) return false;
-                if (endTo && endDateText && endDateText > endTo) return false;
-                return true;
-            });
-
-            if (currentSortKey !== null) {
-                const ths = table.querySelectorAll('thead th');
-                let colIndex = 0;
-                ths.forEach((th, idx) => {
-                    if (th.dataset.key === currentSortKey) {
-                        colIndex = idx;
-                    }
-                });
-                filteredRows.sort((a, b) => {
-                    const av = (a.children[colIndex].innerText || '').trim();
-                    const bv = (b.children[colIndex].innerText || '').trim();
-                    const an = parseFloat(av);
-                    const bn = parseFloat(bv);
-                    let comp;
-                    if (!Number.isNaN(an) && !Number.isNaN(bn)) {
-                        comp = an - bn;
-                    } else {
-                        comp = av.localeCompare(bv, 'zh-CN');
-                    }
-                    return currentSortAsc ? comp : -comp;
-                });
-            }
-
-            currentFiltered = filteredRows;
-            currentPage = 1;
-            updateSortArrows();
-            renderPage();
-        }
-
-        filterGroup.addEventListener('input', applyFilterAndSort);
-        filterRegion.addEventListener('input', applyFilterAndSort);
-        if (filterAgency) filterAgency.addEventListener('input', applyFilterAndSort);
-        if (filterHotel) filterHotel.addEventListener('input', applyFilterAndSort);
-        if (filterStartFrom) filterStartFrom.addEventListener('change', applyFilterAndSort);
-        if (filterStartTo) filterStartTo.addEventListener('change', applyFilterAndSort);
-        if (filterEndFrom) filterEndFrom.addEventListener('change', applyFilterAndSort);
-        if (filterEndTo) filterEndTo.addEventListener('change', applyFilterAndSort);
-
-        function updateSortArrows() {
-            table.querySelectorAll('thead th').forEach(th => {
-                th.classList.remove('sort-asc', 'sort-desc');
-                if (th.dataset.key === currentSortKey) {
-                    th.classList.add(currentSortAsc ? 'sort-asc' : 'sort-desc');
-                }
-            });
-        }
-
-        const ths = table.querySelectorAll('thead th');
-        ths.forEach(th => {
-            th.addEventListener('click', function () {
-                const key = this.dataset.key;
-                if (!key) return;
-                if (currentSortKey === key) {
-                    currentSortAsc = !currentSortAsc;
-                } else {
-                    currentSortKey = key;
-                    currentSortAsc = true;
-                }
-                applyFilterAndSort();
-            });
-        });
-
-        // 初次渲染
-        applyFilterAndSort();
-    })();
-
-    // 多团统计列表：筛选 + 排序（每页 20 条）
+    // 团列表：动态加载
     (function () {
         const table = document.getElementById('group-stats-table');
-        if (!table) return;
-
         const tbody = table.querySelector('tbody');
-        const rows = Array.from(tbody.querySelectorAll('tr'));
         const pager = document.getElementById('group-stats-pager');
-
         const filterGroupNo = document.getElementById('group-filter-group-no');
         const filterRegion = document.getElementById('group-filter-region');
         const filterAgency = document.getElementById('group-filter-agency');
@@ -362,311 +192,259 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         const filterStartFrom = document.getElementById('group-filter-start-from');
         const filterStartTo = document.getElementById('group-filter-start-to');
         const filterClearBtn = document.getElementById('group-filter-clear');
+        let currentSortKey = null;
+        let currentSortAsc = true;
+        let currentPage = 1;
+
+        function getParams() {
+            const p = { table: 'group_stats', page: currentPage, page_size: PAGE_SIZE };
+            if (filterGroupNo && filterGroupNo.value) p.group_no = filterGroupNo.value;
+            if (filterRegion && filterRegion.value) p.region = filterRegion.value;
+            if (filterAgency && filterAgency.value) p.agency = filterAgency.value;
+            if (filterHotel && filterHotel.value) p.hotel = filterHotel.value;
+            if (filterStartFrom && filterStartFrom.value) p.start_from = filterStartFrom.value;
+            if (filterStartTo && filterStartTo.value) p.start_to = filterStartTo.value;
+            if (currentSortKey) p.sort = currentSortKey;
+            p.order = currentSortAsc ? 'asc' : 'desc';
+            return p;
+        }
+
+        function renderRow(g) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + (g.group_no || '') + '</td><td>' + (g.region || '') + '</td><td>' + (g.agency || '') + '</td><td>' + (g.hotel || '') + '</td><td>' + (g.start_date || '') + '</td><td>' + (g.end_date || '') + '</td><td>' + (g.feedback_rate || '') + '</td><td>' + (g.guide_language_mean || '') + '</td><td>' + (g.guide_service_mean || '') + '</td><td>' + (g.vehicle_comfort_mean || '') + '</td><td>' + (g.vehicle_clean_mean || '') + '</td><td>' + (g.driver_service_mean || '') + '</td><td>' + (g.food_quality_mean || '') + '</td><td>' + (g.restaurant_environment_mean || '') + '</td><td>' + (g.total_mean || '') + '</td>';
+            return tr;
+        }
 
         function updateSortArrows() {
             table.querySelectorAll('thead th').forEach(th => {
                 th.classList.remove('sort-asc', 'sort-desc');
-                if (th.dataset.key === currentSortKey) {
-                    th.classList.add(currentSortAsc ? 'sort-asc' : 'sort-desc');
+                if (th.dataset.key === currentSortKey) th.classList.add(currentSortAsc ? 'sort-asc' : 'sort-desc');
+            });
+        }
+
+        function load() {
+            tbody.innerHTML = '<tr><td colspan="15" class="loading">加载中...</td></tr>';
+            fetchApi(getParams()).then(data => {
+                tbody.innerHTML = '';
+                if (!data.rows || data.rows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="15">暂无团数据。</td></tr>';
+                } else {
+                    data.rows.forEach(g => tbody.appendChild(renderRow(g)));
+                }
+                if (pager) {
+                    const total = data.total || 0;
+                    const totalPages = data.total_pages || 1;
+                    pager.innerHTML = '';
+                    const prev = document.createElement('button');
+                    prev.textContent = '上一页';
+                    prev.disabled = currentPage <= 1;
+                    prev.addEventListener('click', () => { if (currentPage > 1) { currentPage -= 1; load(); } });
+                    const next = document.createElement('button');
+                    next.textContent = '下一页';
+                    next.disabled = currentPage >= totalPages;
+                    next.addEventListener('click', () => { if (currentPage < totalPages) { currentPage += 1; load(); } });
+                    const info = document.createElement('span');
+                    info.textContent = '第 ' + currentPage + ' / ' + totalPages + ' 页（共 ' + total + ' 条）';
+                    pager.appendChild(prev);
+                    pager.appendChild(next);
+                    pager.appendChild(info);
                 }
             });
         }
 
-        const PAGE_SIZE = 20;
-        let currentSortKey = null;
-        let currentSortAsc = true;
-        let currentPage = 1;
-        let currentFiltered = rows.slice();
+        function onFilter() { currentPage = 1; load(); }
+        [filterGroupNo, filterRegion, filterAgency, filterHotel, filterStartFrom, filterStartTo].forEach(el => {
+            if (el) { el.addEventListener('input', onFilter); if (el.type === 'date') el.addEventListener('change', onFilter); }
+        });
+        if (filterClearBtn) filterClearBtn.addEventListener('click', () => {
+            if (filterGroupNo) filterGroupNo.value = '';
+            if (filterRegion) filterRegion.value = '';
+            if (filterAgency) filterAgency.value = '';
+            if (filterHotel) filterHotel.value = '';
+            if (filterStartFrom) filterStartFrom.value = '';
+            if (filterStartTo) filterStartTo.value = '';
+            onFilter();
+        });
 
-        function renderPage() {
-            const total = currentFiltered.length;
-            const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-            if (currentPage > totalPages) currentPage = totalPages;
-            const start = (currentPage - 1) * PAGE_SIZE;
-            const end = start + PAGE_SIZE;
-            const pageRows = currentFiltered.slice(start, end);
-
-            tbody.innerHTML = '';
-            pageRows.forEach(r => tbody.appendChild(r));
-
-            if (pager) {
-                pager.innerHTML = '';
-                const info = document.createElement('span');
-                info.textContent = `第 ${currentPage} / ${totalPages} 页（共 ${total} 条）`;
-
-                const prev = document.createElement('button');
-                prev.textContent = '上一页';
-                prev.disabled = currentPage <= 1;
-                prev.addEventListener('click', () => {
-                    if (currentPage > 1) {
-                        currentPage -= 1;
-                        renderPage();
-                        if (window.renderGroupChart) window.renderGroupChart();
-                    }
-                });
-
-                const next = document.createElement('button');
-                next.textContent = '下一页';
-                next.disabled = currentPage >= totalPages;
-                next.addEventListener('click', () => {
-                    if (currentPage < totalPages) {
-                        currentPage += 1;
-                        renderPage();
-                        if (window.renderGroupChart) window.renderGroupChart();
-                    }
-                });
-
-                pager.appendChild(prev);
-                pager.appendChild(next);
-                pager.appendChild(info);
-            }
-        }
-
-        function applyFilterAndSort() {
-            const kwGroupNo = (filterGroupNo.value || '').trim().toLowerCase();
-            const kwRegion = (filterRegion.value || '').trim().toLowerCase();
-            const kwAgency = (filterAgency.value || '').trim().toLowerCase();
-            const kwHotel = (filterHotel.value || '').trim().toLowerCase();
-            const startFrom = filterStartFrom.value;
-            const startTo = filterStartTo.value;
-
-            let filtered = rows.filter(row => {
-                const cells = row.querySelectorAll('td');
-                if (!cells.length) return true;
-
-                const groupNoText = (cells[1].innerText || '').toLowerCase();
-                const regionText = (cells[2].innerText || '').toLowerCase();
-                const agencyText = (cells[3].innerText || '').toLowerCase();
-                const hotelText = (cells[4].innerText || '').toLowerCase();
-                const startDateText = (cells[5].innerText || '').trim();
-
-                if (kwGroupNo && !groupNoText.includes(kwGroupNo)) return false;
-                if (kwRegion && !regionText.includes(kwRegion)) return false;
-                if (kwAgency && !agencyText.includes(kwAgency)) return false;
-                if (kwHotel && !hotelText.includes(kwHotel)) return false;
-
-                if (startFrom && startDateText && startDateText < startFrom) return false;
-                if (startTo && startDateText && startDateText > startTo) return false;
-
-                return true;
-            });
-
-            // 对于当前被筛掉的团，取消其勾选状态（不再展示在图表中）
-            const visibleSet = new Set(filtered);
-            rows.forEach(row => {
-                if (!visibleSet.has(row)) {
-                    const cb = row.querySelector('.group-select');
-                    if (cb) {
-                        cb.checked = false;
-                    }
-                }
-            });
-
-            if (currentSortKey !== null) {
-                const ths = table.querySelectorAll('thead th');
-                let colIndex = 0;
-                ths.forEach((th, idx) => {
-                    if (th.dataset.key === currentSortKey) colIndex = idx;
-                });
-                filtered.sort((a, b) => {
-                    if (currentSortKey === 'group_select') {
-                        const cbA = a.children[colIndex].querySelector('.group-select');
-                        const cbB = b.children[colIndex].querySelector('.group-select');
-                        const va = cbA && cbA.checked ? 1 : 0;
-                        const vb = cbB && cbB.checked ? 1 : 0;
-                        return currentSortAsc ? va - vb : vb - va;
-                    }
-                    const av = (a.children[colIndex].innerText || '').trim();
-                    const bv = (b.children[colIndex].innerText || '').trim();
-                    const an = parseFloat(av.replace('%', ''));
-                    const bn = parseFloat(bv.replace('%', ''));
-                    let comp;
-                    if (!Number.isNaN(an) && !Number.isNaN(bn)) {
-                        comp = an - bn;
-                    } else {
-                        comp = av.localeCompare(bv, 'zh-CN');
-                    }
-                    return currentSortAsc ? comp : -comp;
-                });
-            }
-
-            updateSortArrows();
-            currentFiltered = filtered;
-            currentPage = 1;
-            renderPage();
-
-            // 筛选后按当前勾选重新绘图
-            if (window.renderGroupChart) {
-                window.renderGroupChart();
-            }
-        }
-
-        [filterGroupNo, filterRegion, filterAgency, filterHotel, filterStartFrom, filterStartTo]
-            .forEach(input => {
-                if (input) {
-                    input.addEventListener('input', applyFilterAndSort);
-                    if (input.type === 'date') {
-                        input.addEventListener('change', applyFilterAndSort);
-                    }
-                }
-            });
-
-        if (filterClearBtn) {
-            filterClearBtn.addEventListener('click', function () {
-                if (filterGroupNo) filterGroupNo.value = '';
-                if (filterRegion) filterRegion.value = '';
-                if (filterAgency) filterAgency.value = '';
-                if (filterHotel) filterHotel.value = '';
-                if (filterStartFrom) filterStartFrom.value = '';
-                if (filterStartTo) filterStartTo.value = '';
-                applyFilterAndSort();
-            });
-        }
-
-        const ths = table.querySelectorAll('thead th');
-        ths.forEach(th => {
+        table.querySelectorAll('thead th').forEach(th => {
             th.addEventListener('click', function () {
                 const key = this.dataset.key;
                 if (!key) return;
-                if (currentSortKey === key) {
-                    currentSortAsc = !currentSortAsc;
-                } else {
-                    currentSortKey = key;
-                    currentSortAsc = true;
-                }
-                applyFilterAndSort();
+                if (currentSortKey === key) currentSortAsc = !currentSortAsc;
+                else { currentSortKey = key; currentSortAsc = true; }
+                currentPage = 1;
+                updateSortArrows();
+                load();
             });
         });
+
+        load();
     })();
 
-    // 图表：多团各项平均分 + 标准差（阴影）折线图
+    /* 问卷明细暂注释
     (function () {
-        const ctx = document.getElementById('stat-chart').getContext('2d');
-        let groupCheckboxes = Array.from(document.querySelectorAll('.group-select'));
-        let chart = null;
+        const table = document.getElementById('traveler-table');
+        const tbody = table.querySelector('tbody');
+        const pager = document.getElementById('traveler-pager');
+        const filterGroup = document.getElementById('filter-group');
+        const filterRegion = document.getElementById('filter-region');
+        const filterAgency = document.getElementById('filter-agency');
+        const filterHotel = document.getElementById('filter-hotel');
+        const filterStartFrom = document.getElementById('filter-start-from');
+        const filterStartTo = document.getElementById('filter-start-to');
+        let currentSortKey = null;
+        let currentSortAsc = true;
+        let currentPage = 1;
 
-        // 评分项定义（顺序固定）
-        const metricDefs = [
-            {key: 'guide_language', label: '地陪语言和讲解'},
-            {key: 'guide_service', label: '地陪服务态度'},
-            {key: 'vehicle_comfort', label: '车辆舒适度'},
-            {key: 'vehicle_clean', label: '车辆干净程度'},
-            {key: 'driver_service', label: '司机服务'},
-            {key: 'food_quality', label: '餐饮质量'},
-            {key: 'restaurant_environment', label: '餐厅环境'},
-            {key: 'total', label: '综合得分'},
-        ];
-
-        const metricLabels = metricDefs.map(m => m.label);
-
-        function buildDatasets() {
-            const selectedGroups = groupCheckboxes
-                .filter(cb => cb.checked)
-                .map(cb => cb.getAttribute('data-group-no'))
-                .filter(gno => !!gno);
-
-            const colors = [
-                '54, 162, 235',
-                '255, 99, 132',
-                '255, 206, 86',
-                '75, 192, 192',
-                '153, 102, 255',
-                '255, 159, 64',
-            ];
-
-            const datasets = [];
-
-            selectedGroups.forEach((gno, idx) => {
-                const info = chartStats[gno];
-                if (!info) return;
-
-                const color = colors[idx % colors.length];
-                const means = [];
-
-                metricDefs.forEach(m => {
-                    if (m.key === 'total') {
-                        means.push(info.total.mean || 0);
-                    } else {
-                        const metricInfo = (info.metrics && info.metrics[m.key]) || {mean: 0};
-                        means.push(metricInfo.mean || 0);
-                    }
-                });
-
-                datasets.push({
-                    label: gno,
-                    data: means,
-                    borderColor: 'rgba(' + color + ', 1)',
-                    backgroundColor: 'rgba(' + color + ', 0.6)',
-                    pointRadius: 3,
-                    tension: 0.2,
-                    fill: false,
-                });
-            });
-
-            return datasets;
+        function getParams() {
+            const p = { table: 'travelers', page: currentPage, page_size: PAGE_SIZE };
+            if (filterGroup && filterGroup.value) p.group = filterGroup.value;
+            if (filterRegion && filterRegion.value) p.region = filterRegion.value;
+            if (filterAgency && filterAgency.value) p.agency = filterAgency.value;
+            if (filterHotel && filterHotel.value) p.hotel = filterHotel.value;
+            if (filterStartFrom && filterStartFrom.value) p.start_from = filterStartFrom.value;
+            if (filterStartTo && filterStartTo.value) p.start_to = filterStartTo.value;
+            if (currentSortKey) p.sort = currentSortKey;
+            p.order = currentSortAsc ? 'asc' : 'desc';
+            return p;
         }
 
-        function renderChart() {
-            if (chart) {
-                chart.destroy();
-            }
+        function renderRow(t) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + (t.group_no || '') + '</td><td>' + (t.region || '') + '</td><td>' + (t.agency || '') + '</td><td>' + (t.hotel || '') + '</td><td>' + (t.start_date || '') + '</td><td>' + (t.end_date || '') + '</td><td>' + (t.guide_language || '') + '</td><td>' + (t.guide_service || '') + '</td><td>' + (t.vehicle_comfort || '') + '</td><td>' + (t.vehicle_clean || '') + '</td><td>' + (t.driver_service || '') + '</td><td>' + (t.food_quality || '') + '</td><td>' + (t.restaurant_environment || '') + '</td><td>' + (t.composite_score || '') + '</td>';
+            return tr;
+        }
 
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: metricLabels,
-                    datasets: buildDatasets(),
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    },
-                    plugins: { legend: {} }
+        function updateSortArrows() {
+            table.querySelectorAll('thead th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.dataset.key === currentSortKey) th.classList.add(currentSortAsc ? 'sort-asc' : 'sort-desc');
+            });
+        }
+
+        function load() {
+            tbody.innerHTML = '<tr><td colspan="14" class="loading">加载中...</td></tr>';
+            fetchApi(getParams()).then(data => {
+                tbody.innerHTML = '';
+                if (!data.rows || data.rows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="14">暂无旅客数据。</td></tr>';
+                } else {
+                    data.rows.forEach(t => tbody.appendChild(renderRow(t)));
+                }
+                if (pager) {
+                    const total = data.total || 0;
+                    const totalPages = data.total_pages || 1;
+                    pager.innerHTML = '';
+                    const prev = document.createElement('button');
+                    prev.textContent = '上一页';
+                    prev.disabled = currentPage <= 1;
+                    prev.addEventListener('click', () => { if (currentPage > 1) { currentPage -= 1; load(); } });
+                    const next = document.createElement('button');
+                    next.textContent = '下一页';
+                    next.disabled = currentPage >= totalPages;
+                    next.addEventListener('click', () => { if (currentPage < totalPages) { currentPage += 1; load(); } });
+                    const info = document.createElement('span');
+                    info.textContent = '第 ' + currentPage + ' / ' + totalPages + ' 页（共 ' + total + ' 条）';
+                    pager.appendChild(prev);
+                    pager.appendChild(next);
+                    pager.appendChild(info);
                 }
             });
         }
 
-        function bindCheckboxEvents() {
-            groupCheckboxes.forEach(cb => {
-                cb.addEventListener('change', renderChart);
+        [filterGroup, filterRegion, filterAgency, filterHotel, filterStartFrom, filterStartTo].forEach(el => {
+            if (el) { el.addEventListener('input', () => { currentPage = 1; load(); }); if (el.type === 'date') el.addEventListener('change', () => { currentPage = 1; load(); }); }
+        });
+
+        table.querySelectorAll('thead th').forEach(th => {
+            th.addEventListener('click', function () {
+                const key = this.dataset.key;
+                if (!key) return;
+                if (currentSortKey === key) currentSortAsc = !currentSortAsc;
+                else { currentSortKey = key; currentSortAsc = true; }
+                currentPage = 1;
+                updateSortArrows();
+                load();
+            });
+        });
+
+        load();
+    })();
+    */
+
+    // 分组统计：动态加载 + 排序 + 日期筛选
+    (function () {
+        const table = document.getElementById('group-by-table');
+        const select = document.getElementById('group-by-select');
+        const tbody = document.querySelector('#group-by-table tbody');
+        const filterStartFrom = document.getElementById('group-by-start-from');
+        const filterStartTo = document.getElementById('group-by-start-to');
+        const filterEndFrom = document.getElementById('group-by-end-from');
+        const filterEndTo = document.getElementById('group-by-end-to');
+        const filterClearBtn = document.getElementById('group-by-filter-clear');
+        let currentSortKey = null;
+        let currentSortAsc = true;
+
+        function getParams() {
+            const p = { table: 'group_by', by: (select && select.value) || 'agency' };
+            if (filterStartFrom && filterStartFrom.value) p.start_from = filterStartFrom.value;
+            if (filterStartTo && filterStartTo.value) p.start_to = filterStartTo.value;
+            if (filterEndFrom && filterEndFrom.value) p.end_from = filterEndFrom.value;
+            if (filterEndTo && filterEndTo.value) p.end_to = filterEndTo.value;
+            if (currentSortKey) p.sort = currentSortKey;
+            p.order = currentSortAsc ? 'asc' : 'desc';
+            return p;
+        }
+
+        function updateSortArrows() {
+            table.querySelectorAll('thead th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.dataset.key === currentSortKey) th.classList.add(currentSortAsc ? 'sort-asc' : 'sort-desc');
             });
         }
 
-        bindCheckboxEvents();
-
-        const selectAllBtn = document.getElementById('group-select-all');
-        const selectNoneBtn = document.getElementById('group-select-none');
-
-        if (selectAllBtn) {
-            selectAllBtn.addEventListener('click', function () {
-                // 只全选当前筛选结果中仍然展示在表格里的团
-                const visibleCheckboxes = Array.from(document.querySelectorAll('#group-stats-table tbody .group-select'));
-                visibleCheckboxes.forEach(cb => {
-                    cb.checked = true;
-                });
-                renderChart();
+        function load() {
+            tbody.innerHTML = '<tr><td colspan="10" class="loading">加载中...</td></tr>';
+            fetchApi(getParams()).then(data => {
+                tbody.innerHTML = '';
+                if (!data.rows || data.rows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="10">暂无数据。</td></tr>';
+                } else {
+                    data.rows.forEach(r => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = '<td>' + (r.key || '') + '</td><td>' + (r.count || 0) + '</td><td>' + (r.avg_composite || '') + '</td><td>' + (r.guide_language_mean || '') + '</td><td>' + (r.guide_service_mean || '') + '</td><td>' + (r.vehicle_comfort_mean || '') + '</td><td>' + (r.vehicle_clean_mean || '') + '</td><td>' + (r.driver_service_mean || '') + '</td><td>' + (r.food_quality_mean || '') + '</td><td>' + (r.restaurant_environment_mean || '') + '</td>';
+                        tbody.appendChild(tr);
+                    });
+                }
             });
         }
 
-        if (selectNoneBtn) {
-            selectNoneBtn.addEventListener('click', function () {
-                // 只取消当前表格中可见团的勾选
-                const visibleCheckboxes = Array.from(document.querySelectorAll('#group-stats-table tbody .group-select'));
-                visibleCheckboxes.forEach(cb => {
-                    cb.checked = false;
-                });
-                renderChart();
-            });
+        if (select) {
+            select.addEventListener('change', () => { currentSortKey = null; currentSortAsc = true; updateSortArrows(); load(); });
+            load();
         }
 
-        // 初次渲染
-        renderChart();
+        [filterStartFrom, filterStartTo, filterEndFrom, filterEndTo].forEach(el => {
+            if (el) { el.addEventListener('input', load); el.addEventListener('change', load); }
+        });
+        if (filterClearBtn) filterClearBtn.addEventListener('click', () => {
+            if (filterStartFrom) filterStartFrom.value = '';
+            if (filterStartTo) filterStartTo.value = '';
+            if (filterEndFrom) filterEndFrom.value = '';
+            if (filterEndTo) filterEndTo.value = '';
+            load();
+        });
 
-        // 暴露到全局，供筛选逻辑调用
-        window.renderGroupChart = renderChart;
+        table.querySelectorAll('thead th').forEach(th => {
+            th.addEventListener('click', function () {
+                const key = this.dataset.key;
+                if (!key) return;
+                if (currentSortKey === key) currentSortAsc = !currentSortAsc;
+                else { currentSortKey = key; currentSortAsc = true; }
+                updateSortArrows();
+                load();
+            });
+        });
     })();
 </script>
 {% endblock %}

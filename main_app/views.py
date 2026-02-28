@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect
+from django.http import JsonResponse
 from django.conf import settings
 from django.urls import reverse
 from pathlib import Path
@@ -373,16 +374,258 @@ def questionnaire_view(request):
             },
         }
 
-    # JSON 供前端表格/图表使用
-    travelers_json = json.dumps(enriched_travelers, ensure_ascii=False)
-    chart_stats_json = json.dumps(chart_stats, ensure_ascii=False)
-
     context = {
         'groups': groups,
-        'travelers': enriched_travelers,
-        'travelers_json': travelers_json,
-        'group_stats': group_stats,
-        'chart_stats_json': chart_stats_json,
+        'travelers': [],
+        'group_stats': [],
     }
     return render(request, 'questionnaire_view.html', context)
+
+
+def _load_view_data():
+    """加载问卷查看所需数据：enriched_travelers, group_stats, metric_defs"""
+    _ensure_data_dir()
+    groups = _read_csv(GROUP_CSV, GROUP_FIELDS)
+    travelers = _read_csv(TRAVELER_CSV, TRAVELER_FIELDS)
+    group_map = {(g.get('group_no') or '').strip(): g for g in groups if (g.get('group_no') or '').strip()}
+    METRIC_KEYS = ['guide_language', 'guide_service', 'vehicle_comfort', 'vehicle_clean', 'driver_service', 'food_quality', 'restaurant_environment']
+    enriched_travelers = []
+    for t in travelers:
+        group_no = (t.get('group_no') or '').strip()
+        g = group_map.get(group_no, {})
+        s = 0.0
+        valid = False
+        for k in METRIC_KEYS:
+            try:
+                v = float(t.get(k) or 0)
+            except ValueError:
+                v = 0
+            if v:
+                valid = True
+            s += v
+        composite_score = round(s / len(METRIC_KEYS), 2) if valid else 0.0
+        enriched_travelers.append({
+            'group_no': group_no,
+            'region': g.get('region', ''),
+            'agency': g.get('agency', ''),
+            'hotel': g.get('hotel', ''),
+            'start_date': g.get('start_date', ''),
+            'end_date': g.get('end_date', ''),
+            'guide_language': t.get('guide_language', ''),
+            'guide_service': t.get('guide_service', ''),
+            'vehicle_comfort': t.get('vehicle_comfort', ''),
+            'vehicle_clean': t.get('vehicle_clean', ''),
+            'driver_service': t.get('driver_service', ''),
+            'food_quality': t.get('food_quality', ''),
+            'restaurant_environment': t.get('restaurant_environment', ''),
+            'composite_score': composite_score,
+        })
+    metric_defs = [
+        ('guide_language', '地陪语言'), ('guide_service', '服务态度'), ('vehicle_comfort', '车辆舒适度'),
+        ('vehicle_clean', '车辆干净'), ('driver_service', '司机服务'), ('food_quality', '餐饮质量'),
+        ('restaurant_environment', '餐厅环境'),
+    ]
+
+    def _calc_mean(values):
+        if not values:
+            return 0.0
+        return round(sum(values) / len(values), 2)
+
+    group_stats = []
+    all_group_nos = sorted({(g.get('group_no') or '').strip() for g in groups if (g.get('group_no') or '').strip()})
+    for gno in all_group_nos:
+        base_info = group_map.get(gno, {})
+        group_travelers = [t for t in enriched_travelers if (t.get('group_no') or '').strip() == gno]
+        metrics_for_group = {}
+        for key, label in metric_defs:
+            vals = []
+            for t in group_travelers:
+                try:
+                    vals.append(float(t.get(key) or 0))
+                except ValueError:
+                    pass
+            metrics_for_group[key] = {'label': label, 'mean': _calc_mean(vals)}
+        total_vals = []
+        for t in group_travelers:
+            s = 0.0
+            valid = False
+            for key, _ in metric_defs:
+                try:
+                    v = float(t.get(key) or 0)
+                except ValueError:
+                    v = 0
+                if v:
+                    valid = True
+                s += v
+            if valid:
+                total_vals.append(s / len(metric_defs))
+        total_mean = _calc_mean(total_vals)
+        group_entry = {
+            'group_no': gno, 'region': base_info.get('region', ''),
+            'agency': base_info.get('agency', ''), 'hotel': base_info.get('hotel', ''),
+            'start_date': base_info.get('start_date', ''), 'end_date': base_info.get('end_date', ''),
+            'feedback_rate': base_info.get('feedback_rate', ''),
+            'total_mean': total_mean,
+        }
+        for key, _ in metric_defs:
+            group_entry[f'{key}_mean'] = metrics_for_group[key]['mean']
+        group_stats.append(group_entry)
+    return enriched_travelers, group_stats
+
+
+def view_data_api(request):
+    """动态分页 API：table=travelers|group_stats|group_by, page, page_size, filters, sort, order"""
+    PAGE_SIZE = 20
+    enriched_travelers, group_stats = _load_view_data()
+
+    table = request.GET.get('table', '')
+    page = max(1, int(request.GET.get('page', 1)))
+    page_size = min(100, max(1, int(request.GET.get('page_size', PAGE_SIZE))))
+    sort_key = request.GET.get('sort', '')
+    order = request.GET.get('order', 'asc')
+
+    # group_by: 按地接社/地区/酒店聚合
+    if table == 'group_by':
+        by = request.GET.get('by', 'agency')
+        sort_key = request.GET.get('sort', '')
+        order = request.GET.get('order', 'asc')
+        start_from = request.GET.get('start_from', '')
+        start_to = request.GET.get('start_to', '')
+        end_from = request.GET.get('end_from', '')
+        end_to = request.GET.get('end_to', '')
+        key_map = {'agency': 'agency', 'region': 'region', 'hotel': 'hotel'}
+        key_field = key_map.get(by, 'agency')
+        label_map = {'agency': '地接社', 'region': '地区', 'hotel': '酒店'}
+        label = label_map.get(by, '地接社')
+
+        # 日期筛选：与统计相同的逻辑
+        filtered_stats = [g for g in group_stats if
+            (not start_from or (g.get('start_date') or '') >= start_from) and
+            (not start_to or (g.get('start_date') or '') <= start_to) and
+            (not end_from or (g.get('end_date') or '') >= end_from) and
+            (not end_to or (g.get('end_date') or '') <= end_to)
+        ]
+
+        from collections import defaultdict
+        agg = defaultdict(lambda: {'count': 0, 'total': 0.0, 'metrics': defaultdict(list)})
+        for g in filtered_stats:
+            k = (g.get(key_field) or '').strip() or '(空)'
+            agg[k]['count'] += 1
+            agg[k]['total'] += float(g.get('total_mean') or 0)
+            for m in ['guide_language_mean', 'guide_service_mean', 'vehicle_comfort_mean', 'vehicle_clean_mean', 'driver_service_mean', 'food_quality_mean', 'restaurant_environment_mean']:
+                agg[k]['metrics'][m].append(float(g.get(m) or 0))
+        rows = []
+        for k, v in agg.items():
+            ms = {m: round(sum(v['metrics'][m]) / len(v['metrics'][m]), 2) if v['metrics'][m] else 0 for m in v['metrics']}
+            rows.append({
+                'key': k,
+                'label': label,
+                'count': v['count'],
+                'avg_composite': round(v['total'] / v['count'], 2),
+                **ms,
+            })
+        # 排序（与 group_stats / travelers 同样逻辑）
+        sort_col_map = {
+            'key': 'key', 'count': 'count', 'avg_composite': 'avg_composite',
+            'guide_language_mean': 'guide_language_mean', 'guide_service_mean': 'guide_service_mean',
+            'vehicle_comfort_mean': 'vehicle_comfort_mean', 'vehicle_clean_mean': 'vehicle_clean_mean',
+            'driver_service_mean': 'driver_service_mean', 'food_quality_mean': 'food_quality_mean',
+            'restaurant_environment_mean': 'restaurant_environment_mean',
+        }
+        col = sort_col_map.get(sort_key, '')
+        if col:
+            def _sort_val(r, c):
+                v = r.get(c)
+                if v is None or v == '':
+                    return 0 if c != 'key' else ''
+                if c == 'key':
+                    return str(v)
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    return str(v)
+            rev = order != 'asc'
+            rows = sorted(rows, key=lambda r: _sort_val(r, col), reverse=rev)
+        return JsonResponse({'rows': rows, 'total': len(rows)})
+
+    # travelers 表格
+    if table == 'travelers':
+        rows = enriched_travelers
+        kw_group = (request.GET.get('group', '') or '').strip().lower()
+        kw_region = (request.GET.get('region', '') or '').strip().lower()
+        kw_agency = (request.GET.get('agency', '') or '').strip().lower()
+        kw_hotel = (request.GET.get('hotel', '') or '').strip().lower()
+        start_from = request.GET.get('start_from', '')
+        start_to = request.GET.get('start_to', '')
+        end_from = request.GET.get('end_from', '')
+        end_to = request.GET.get('end_to', '')
+        rows = [r for r in rows if
+            (not kw_group or (r.get('group_no') or '').lower().find(kw_group) >= 0) and
+            (not kw_region or (r.get('region') or '').lower().find(kw_region) >= 0) and
+            (not kw_agency or (r.get('agency') or '').lower().find(kw_agency) >= 0) and
+            (not kw_hotel or (r.get('hotel') or '').lower().find(kw_hotel) >= 0) and
+            (not start_from or (r.get('start_date') or '') >= start_from) and
+            (not start_to or (r.get('start_date') or '') <= start_to) and
+            (not end_from or (r.get('end_date') or '') >= end_from) and
+            (not end_to or (r.get('end_date') or '') <= end_to)
+        ]
+        sort_col_map = {
+            'group_no': 'group_no', 'region': 'region', 'agency': 'agency', 'hotel': 'hotel',
+            'start_date': 'start_date', 'end_date': 'end_date',
+            'guide_language': 'guide_language', 'guide_service': 'guide_service',
+            'vehicle_comfort': 'vehicle_comfort', 'vehicle_clean': 'vehicle_clean',
+            'driver_service': 'driver_service', 'food_quality': 'food_quality',
+            'restaurant_environment': 'restaurant_environment', 'total_score': 'composite_score',
+        }
+        col = sort_col_map.get(sort_key, '')
+        if col:
+            rev = order != 'asc'
+            rows = sorted(rows, key=lambda r: (float(r.get(col)) if isinstance(r.get(col), (int, float)) or (isinstance(r.get(col), str) and r.get(col).replace('.','',1).isdigit()) else r.get(col) or ''), reverse=rev)
+        total = len(rows)
+        start = (page - 1) * page_size
+        page_rows = rows[start:start + page_size]
+        return JsonResponse({'rows': page_rows, 'total': total, 'page': page, 'total_pages': max(1, (total + page_size - 1) // page_size)})
+
+    # group_stats 表格
+    if table == 'group_stats':
+        rows = group_stats
+        kw_group = (request.GET.get('group_no', '') or '').strip().lower()
+        kw_region = (request.GET.get('region', '') or '').strip().lower()
+        kw_agency = (request.GET.get('agency', '') or '').strip().lower()
+        kw_hotel = (request.GET.get('hotel', '') or '').strip().lower()
+        start_from = request.GET.get('start_from', '')
+        start_to = request.GET.get('start_to', '')
+        rows = [r for r in rows if
+            (not kw_group or (r.get('group_no') or '').lower().find(kw_group) >= 0) and
+            (not kw_region or (r.get('region') or '').lower().find(kw_region) >= 0) and
+            (not kw_agency or (r.get('agency') or '').lower().find(kw_agency) >= 0) and
+            (not kw_hotel or (r.get('hotel') or '').lower().find(kw_hotel) >= 0) and
+            (not start_from or (r.get('start_date') or '') >= start_from) and
+            (not start_to or (r.get('start_date') or '') <= start_to)
+        ]
+        sort_col_map = {
+            'group_no': 'group_no', 'region': 'region', 'agency': 'agency', 'hotel': 'hotel',
+            'start_date': 'start_date', 'end_date': 'end_date', 'feedback_rate': 'feedback_rate',
+            'guide_language_mean': 'guide_language_mean', 'guide_service_mean': 'guide_service_mean',
+            'vehicle_comfort_mean': 'vehicle_comfort_mean', 'vehicle_clean_mean': 'vehicle_clean_mean',
+            'driver_service_mean': 'driver_service_mean', 'food_quality_mean': 'food_quality_mean',
+            'restaurant_environment_mean': 'restaurant_environment_mean', 'total_mean': 'total_mean',
+        }
+        col = sort_col_map.get(sort_key, '')
+        if col:
+            def _sort_val(v):
+                if v is None or v == '': return 0
+                s = str(v).replace('%', '')
+                try:
+                    return float(s)
+                except ValueError:
+                    return str(v)
+            rev = order != 'asc'
+            rows = sorted(rows, key=lambda r: _sort_val(r.get(col)), reverse=rev)
+        total = len(rows)
+        start = (page - 1) * page_size
+        page_rows = rows[start:start + page_size]
+        return JsonResponse({'rows': page_rows, 'total': total, 'page': page, 'total_pages': max(1, (total + page_size - 1) // page_size)})
+
+    return JsonResponse({'error': 'invalid table'}, status=400)
 
