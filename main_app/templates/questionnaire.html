@@ -15,9 +15,83 @@ input[type="text"], input[type="number"], input[type="date"] { width: 120px; box
 .pager button { margin-right: 8px; padding: 4px 10px; }
 .group-delete-btn { background: #dc2626; color: #fff; border-color: #b91c1c; }
 .group-delete-btn:hover { background: #b91c1c; }
+.group-exists-overlay { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.group-exists-modal { background: #fff; padding: 24px; border-radius: 8px; max-width: 480px; width: 90%; border: 1px solid var(--border); }
+.group-exists-modal h4 { margin: 0 0 12px 0; }
+.group-exists-info { font-size: 13px; line-height: 1.6; margin-bottom: 16px; color: var(--text); }
+.group-exists-btns { display: flex; gap: 12px; justify-content: flex-end; }
+.confirm-overlay { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.confirm-modal { background: #fff; padding: 24px; border-radius: 8px; max-width: 480px; width: 90%; border: 1px solid var(--border); }
+.confirm-modal h4 { margin: 0 0 12px 0; }
+.confirm-modal p { margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; }
+.confirm-modal-btns { display: flex; gap: 12px; justify-content: flex-end; }
+.confirm-modal-btns .confirm-delete-btn { background: #dc2626; color: #fff; border-color: #b91c1c; }
+.confirm-modal-btns .confirm-delete-btn:hover { background: #b91c1c; }
 {% endblock %}
 {% block content %}
 <h1>问卷录入</h1>
+
+{% if group_exists %}
+<div class="group-exists-overlay" id="group-exists-overlay">
+    <div class="group-exists-modal">
+        <h4>团号已存在</h4>
+        <p>团号「{{ existing_group.group_no }}」已存在。现有信息如下：</p>
+        <div class="group-exists-info">
+            <div>团号：{{ existing_group.group_no }}</div>
+            <div>地接社：{{ existing_group.agency }}</div>
+            <div>酒店：{{ existing_group.hotel }}</div>
+            <div>地区：{{ existing_group.region }}</div>
+            <div>人数：{{ existing_group.people_count }}</div>
+            <div>意见表回收数量：{{ existing_group.feedback_count }}</div>
+            <div>回收率：{{ existing_group.feedback_rate }}</div>
+            <div>开始日期：{{ existing_group.start_date }}</div>
+            <div>截止日期：{{ existing_group.end_date }}</div>
+        </div>
+        <p>是否用当前填写的信息覆盖以上内容？</p>
+        <div class="group-exists-btns">
+            <button type="button" class="submit-btn" id="group-exists-cancel">取消</button>
+            <form method="post" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="entity" value="group">
+                <input type="hidden" name="action" value="create">
+                <input type="hidden" name="confirm_overwrite" value="1">
+                <input type="hidden" name="group_no" value="{{ create_form_data.group_no }}">
+                <input type="hidden" name="agency" value="{{ create_form_data.agency }}">
+                <input type="hidden" name="hotel" value="{{ create_form_data.hotel }}">
+                <input type="hidden" name="region" value="{{ create_form_data.region }}">
+                <input type="hidden" name="people_count" value="{{ create_form_data.people_count }}">
+                <input type="hidden" name="feedback_count" value="{{ create_form_data.feedback_count }}">
+                <input type="hidden" name="start_date" value="{{ create_form_data.start_date }}">
+                <input type="hidden" name="end_date" value="{{ create_form_data.end_date }}">
+                <button type="submit" class="submit-btn">覆盖</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if error == 'group_not_found' %}
+<div class="confirm-overlay" id="group-not-found-overlay">
+    <div class="confirm-modal">
+        <h4>所属团号不存在</h4>
+        <p>所属团号不存在，请先在团列表中创建该团。</p>
+        <div class="confirm-modal-btns">
+            <button type="button" class="submit-btn" id="group-not-found-ok">确定</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div id="delete-group-modal" class="confirm-overlay" style="display: none;">
+    <div class="confirm-modal">
+        <h4>确认删除团</h4>
+        <p id="delete-group-message"></p>
+        <div class="confirm-modal-btns">
+            <button type="button" class="submit-btn" id="delete-group-cancel">取消</button>
+            <button type="button" class="submit-btn confirm-delete-btn" id="delete-group-confirm">确认删除</button>
+        </div>
+    </div>
+</div>
 
 <div class="section">
     <h3>新增团</h3>
@@ -28,35 +102,35 @@ input[type="text"], input[type="number"], input[type="date"] { width: 120px; box
 
         <div class="create-form-row">
             <label>团号：</label>
-            <input type="text" name="group_no" required>
+            <input type="text" name="group_no" required value="{% if group_exists %}{{ create_form_data.group_no }}{% endif %}">
         </div>
         <div class="create-form-row">
             <label>地接社：</label>
-            <input type="text" name="agency">
+            <input type="text" name="agency" value="{% if group_exists %}{{ create_form_data.agency }}{% endif %}">
         </div>
         <div class="create-form-row">
             <label>酒店：</label>
-            <input type="text" name="hotel">
+            <input type="text" name="hotel" value="{% if group_exists %}{{ create_form_data.hotel }}{% endif %}">
         </div>
         <div class="create-form-row">
             <label>地区：</label>
-            <input type="text" name="region">
+            <input type="text" name="region" value="{% if group_exists %}{{ create_form_data.region }}{% endif %}">
         </div>
         <div class="create-form-row">
             <label>人数：</label>
-            <input type="number" name="people_count" min="0">
+            <input type="number" name="people_count" min="0" value="{% if group_exists %}{{ create_form_data.people_count }}{% endif %}">
         </div>
         <div class="create-form-row">
             <label>意见表回收数量：</label>
-            <input type="number" name="feedback_count" min="0">
+            <input type="number" name="feedback_count" min="0" value="{% if group_exists %}{{ create_form_data.feedback_count }}{% endif %}">
         </div>
         <div class="create-form-row">
             <label>开始日期：</label>
-            <input type="date" name="start_date">
+            <input type="date" name="start_date" value="{% if group_exists %}{{ create_form_data.start_date }}{% endif %}">
         </div>
         <div class="create-form-row">
             <label>截止日期：</label>
-            <input type="date" name="end_date">
+            <input type="date" name="end_date" value="{% if group_exists %}{{ create_form_data.end_date }}{% endif %}">
         </div>
 
         <button type="submit" class="submit-btn">新增</button>
@@ -124,7 +198,7 @@ input[type="text"], input[type="number"], input[type="date"] { width: 120px; box
                         <input type="hidden" name="entity" value="group">
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="index" value="{{ idx }}">
-                        <button type="submit" class="submit-btn group-delete-btn"
+                        <button type="button" class="submit-btn group-delete-btn"
                                 data-traveler-count="{{ traveler_count }}">删除</button>
                     </form>
                 </td>
@@ -255,6 +329,28 @@ input[type="text"], input[type="number"], input[type="date"] { width: 120px; box
 </div>
 
 <script>
+    // 所属团号不存在：点击确定关闭弹层
+    (function () {
+        const overlay = document.getElementById('group-not-found-overlay');
+        const okBtn = document.getElementById('group-not-found-ok');
+        if (overlay && okBtn) {
+            okBtn.addEventListener('click', function () {
+                overlay.style.display = 'none';
+            });
+        }
+    })();
+
+    // 团号已存在：点击取消关闭弹层
+    (function () {
+        const overlay = document.getElementById('group-exists-overlay');
+        const cancelBtn = document.getElementById('group-exists-cancel');
+        if (overlay && cancelBtn) {
+            cancelBtn.addEventListener('click', function () {
+                overlay.style.display = 'none';
+            });
+        }
+    })();
+
     // 新增旅客问卷时，评分项（1~5）输入一个数字后自动跳到下一个格子
     (function () {
         const inputs = Array.from(document.querySelectorAll('.auto-next'));
@@ -285,23 +381,45 @@ input[type="text"], input[type="number"], input[type="date"] { width: 120px; box
         }
     })();
 
-    // 删除团前，提示将一并删除多少条旅客信息
+    // 删除团前，弹窗提示将一并删除多少条旅客信息
     (function () {
-        const deleteButtons = document.querySelectorAll('.group-delete-btn');
-        deleteButtons.forEach(function (btn) {
+        const modal = document.getElementById('delete-group-modal');
+        const messageEl = document.getElementById('delete-group-message');
+        const cancelBtn = document.getElementById('delete-group-cancel');
+        const confirmBtn = document.getElementById('delete-group-confirm');
+        let pendingForm = null;
+
+        document.querySelectorAll('.group-delete-btn').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
+                e.preventDefault();
                 const count = parseInt(this.getAttribute('data-traveler-count') || '0', 10);
                 let msg;
                 if (count > 0) {
-                    msg = `该团当前共有 ${count} 条旅客问卷记录。\n删除该团将同时删除这 ${count} 条旅客信息。\n是否确认删除？`;
+                    msg = `该团当前共有 ${count} 条旅客问卷记录。删除该团将同时删除这 ${count} 条旅客信息。是否确认删除？`;
                 } else {
-                    msg = '该团下目前没有旅客问卷记录。\n确认删除该团吗？';
+                    msg = '该团下目前没有旅客问卷记录。确认删除该团吗？';
                 }
-                if (!window.confirm(msg)) {
-                    e.preventDefault();
-                }
+                messageEl.textContent = msg;
+                pendingForm = this.closest('form');
+                modal.style.display = 'flex';
             });
         });
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function () {
+                modal.style.display = 'none';
+                pendingForm = null;
+            });
+        }
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', function () {
+                if (pendingForm) {
+                    pendingForm.submit();
+                }
+                modal.style.display = 'none';
+                pendingForm = null;
+            });
+        }
     })();
 
     // 简单翻页：团列表和旅客列表，每页 20 条

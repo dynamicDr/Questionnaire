@@ -1,4 +1,5 @@
 from decimal import Decimal
+from urllib.parse import urlencode
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
@@ -31,16 +32,26 @@ def _group_to_dict(g):
     }
 
 
+def _score_int(v):
+    """将评分转为整数字符串显示"""
+    if v is None:
+        return ''
+    try:
+        return str(int(round(float(v))))
+    except (TypeError, ValueError):
+        return ''
+
+
 def _traveler_to_dict(t):
     return {
         'group_no': t.group.group_no if t.group_id else '',
-        'guide_language': str(t.guide_language) if t.guide_language is not None else '',
-        'guide_service': str(t.guide_service) if t.guide_service is not None else '',
-        'vehicle_comfort': str(t.vehicle_comfort) if t.vehicle_comfort is not None else '',
-        'vehicle_clean': str(t.vehicle_clean) if t.vehicle_clean is not None else '',
-        'driver_service': str(t.driver_service) if t.driver_service is not None else '',
-        'food_quality': str(t.food_quality) if t.food_quality is not None else '',
-        'restaurant_environment': str(t.restaurant_environment) if t.restaurant_environment is not None else '',
+        'guide_language': _score_int(t.guide_language),
+        'guide_service': _score_int(t.guide_service),
+        'vehicle_comfort': _score_int(t.vehicle_comfort),
+        'vehicle_clean': _score_int(t.vehicle_clean),
+        'driver_service': _score_int(t.driver_service),
+        'food_quality': _score_int(t.food_quality),
+        'restaurant_environment': _score_int(t.restaurant_environment),
     }
 
 
@@ -55,6 +66,31 @@ def _compute_feedback_rate(people_count, feedback_count):
     return ''
 
 
+def _questionnaire_context(request, group_exists=False, existing_group=None, create_form_data=None):
+    """问卷页 GET 或“团号已存在”时的共用 context"""
+    last_group_no = request.GET.get('last_group_no', '') if request.method == 'GET' else ''
+    focus_traveler = request.GET.get('focus_traveler') == '1' if request.method == 'GET' else False
+    error = request.GET.get('error', '') if request.method == 'GET' else ''
+
+    groups_qs = Group.objects.all().order_by('group_no').annotate(traveler_count=Count('travelers'))
+    groups_for_view = [(g.id, _group_to_dict(g), g.traveler_count) for g in groups_qs]
+    travelers_qs = Traveler.objects.select_related('group').all().order_by('-id')
+    travelers = [(t.id, _traveler_to_dict(t)) for t in travelers_qs]
+
+    context = {
+        'groups': groups_for_view,
+        'travelers': travelers,
+        'last_group_no': last_group_no,
+        'focus_traveler': focus_traveler,
+        'error': error,
+    }
+    if group_exists:
+        context['group_exists'] = True
+        context['existing_group'] = existing_group or {}
+        context['create_form_data'] = create_form_data or {}
+    return context
+
+
 def questionnaire(request):
     if request.method == 'POST':
         entity = request.POST.get('entity')
@@ -63,8 +99,45 @@ def questionnaire(request):
         if entity == 'group':
             index_str = request.POST.get('index')
             if action == 'create':
+                confirm_overwrite = request.POST.get('confirm_overwrite') == '1'
                 group_no = request.POST.get('group_no', '').strip()
-                if group_no and not Group.objects.filter(group_no=group_no).exists():
+                existing_group = Group.objects.filter(group_no=group_no).first() if group_no else None
+
+                if confirm_overwrite and existing_group:
+                    # 用户确认覆盖：更新已有团
+                    people_count = request.POST.get('people_count', '').strip()
+                    feedback_count = request.POST.get('feedback_count', '').strip()
+                    start_s = request.POST.get('start_date', '').strip()
+                    end_s = request.POST.get('end_date', '').strip()
+                    existing_group.agency = request.POST.get('agency', '').strip()
+                    existing_group.hotel = request.POST.get('hotel', '').strip()
+                    existing_group.region = request.POST.get('region', '').strip()
+                    existing_group.people_count = int(people_count) if people_count.isdigit() else 0
+                    existing_group.feedback_count = int(feedback_count) if feedback_count.isdigit() else 0
+                    existing_group.feedback_rate = _compute_feedback_rate(people_count, feedback_count)
+                    existing_group.start_date = parse_date(start_s) if start_s else None
+                    existing_group.end_date = parse_date(end_s) if end_s else None
+                    existing_group.save()
+                    return redirect('questionnaire_add')
+                if group_no and existing_group:
+                    # 团号已存在，未确认覆盖：返回页面并提示
+                    context = _questionnaire_context(
+                        request,
+                        group_exists=True,
+                        existing_group=_group_to_dict(existing_group),
+                        create_form_data={
+                            'group_no': group_no,
+                            'agency': request.POST.get('agency', '').strip(),
+                            'hotel': request.POST.get('hotel', '').strip(),
+                            'region': request.POST.get('region', '').strip(),
+                            'people_count': request.POST.get('people_count', '').strip(),
+                            'feedback_count': request.POST.get('feedback_count', '').strip(),
+                            'start_date': request.POST.get('start_date', '').strip(),
+                            'end_date': request.POST.get('end_date', '').strip(),
+                        },
+                    )
+                    return render(request, 'questionnaire.html', context)
+                if group_no and not existing_group:
                     people_count = request.POST.get('people_count', '').strip()
                     feedback_count = request.POST.get('feedback_count', '').strip()
                     start_s = request.POST.get('start_date', '').strip()
@@ -82,6 +155,7 @@ def questionnaire(request):
                         start_date=start_date,
                         end_date=end_date,
                     )
+                    return redirect('questionnaire_add')
 
             elif action in ('update', 'delete') and index_str:
                 try:
@@ -108,8 +182,6 @@ def questionnaire(request):
                 except (ValueError, TypeError):
                     pass
 
-            if action == 'create':
-                return redirect('questionnaire_add')
             return redirect('questionnaire_add')
 
         elif entity == 'traveler':
@@ -117,24 +189,26 @@ def questionnaire(request):
             if action == 'create':
                 group_no = request.POST.get('group_no', '').strip()
                 group = Group.objects.filter(group_no=group_no).first()
-                if group:
-                    def _dec(s):
-                        try:
-                            return Decimal(s) if s else None
-                        except (ValueError, TypeError):
-                            return None
-                    Traveler.objects.create(
-                        group=group,
-                        guide_language=_dec(request.POST.get('guide_language', '').strip()),
-                        guide_service=_dec(request.POST.get('guide_service', '').strip()),
-                        vehicle_comfort=_dec(request.POST.get('vehicle_comfort', '').strip()),
-                        vehicle_clean=_dec(request.POST.get('vehicle_clean', '').strip()),
-                        driver_service=_dec(request.POST.get('driver_service', '').strip()),
-                        food_quality=_dec(request.POST.get('food_quality', '').strip()),
-                        restaurant_environment=_dec(request.POST.get('restaurant_environment', '').strip()),
-                    )
-                    url = f"{reverse('questionnaire_add')}?last_group_no={group_no}&focus_traveler=1"
-                    return redirect(url)
+                if not group:
+                    qs = urlencode({'error': 'group_not_found', 'last_group_no': group_no})
+                    return redirect(f"{reverse('questionnaire_add')}?{qs}")
+                def _dec(s):
+                    try:
+                        return Decimal(s) if s else None
+                    except (ValueError, TypeError):
+                        return None
+                Traveler.objects.create(
+                    group=group,
+                    guide_language=_dec(request.POST.get('guide_language', '').strip()),
+                    guide_service=_dec(request.POST.get('guide_service', '').strip()),
+                    vehicle_comfort=_dec(request.POST.get('vehicle_comfort', '').strip()),
+                    vehicle_clean=_dec(request.POST.get('vehicle_clean', '').strip()),
+                    driver_service=_dec(request.POST.get('driver_service', '').strip()),
+                    food_quality=_dec(request.POST.get('food_quality', '').strip()),
+                    restaurant_environment=_dec(request.POST.get('restaurant_environment', '').strip()),
+                )
+                url = f"{reverse('questionnaire_add')}?last_group_no={group_no}&focus_traveler=1"
+                return redirect(url)
 
             elif action in ('update', 'delete') and index_str:
                 try:
@@ -168,21 +242,7 @@ def questionnaire(request):
                 return redirect('questionnaire_add')
 
     # GET
-    last_group_no = request.GET.get('last_group_no', '')
-    focus_traveler = request.GET.get('focus_traveler') == '1'
-
-    groups_qs = Group.objects.all().order_by('group_no').annotate(traveler_count=Count('travelers'))
-    groups_for_view = [(g.id, _group_to_dict(g), g.traveler_count) for g in groups_qs]
-
-    travelers_qs = Traveler.objects.select_related('group').all().order_by('id')
-    travelers = [(t.id, _traveler_to_dict(t)) for t in travelers_qs]
-
-    context = {
-        'groups': groups_for_view,
-        'travelers': travelers,
-        'last_group_no': last_group_no,
-        'focus_traveler': focus_traveler,
-    }
+    context = _questionnaire_context(request)
     return render(request, 'questionnaire.html', context)
 
 
@@ -432,16 +492,21 @@ def view_data_api(request):
         }
         col = sort_col_map.get(sort_key, '')
         if col:
-            def _sort_val(v):
+            # 字符串列（团号/地区/地接社/酒店/日期）统一用 str 排序，避免 0 与 str 比较导致 TypeError
+            str_cols = {'group_no', 'region', 'agency', 'hotel', 'start_date', 'end_date', 'feedback_rate'}
+            def _sort_val(r):
+                v = r.get(col)
                 if v is None or v == '':
-                    return 0
+                    return '' if col in str_cols else 0
+                if col in str_cols:
+                    return str(v).replace('%', '')
                 s = str(v).replace('%', '')
                 try:
                     return float(s)
                 except ValueError:
                     return str(v)
             rev = order != 'asc'
-            rows = sorted(rows, key=lambda r: _sort_val(r.get(col)), reverse=rev)
+            rows = sorted(rows, key=_sort_val, reverse=rev)
         total = len(rows)
         start = (page - 1) * page_size
         page_rows = rows[start:start + page_size]
