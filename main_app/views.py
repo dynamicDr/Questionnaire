@@ -1,10 +1,12 @@
-from django.shortcuts import render, redirect
+from decimal import Decimal
+
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
-from django.conf import settings
 from django.urls import reverse
-from pathlib import Path
-import csv
-import json
+from django.db.models import Count
+from django.utils.dateparse import parse_date
+
+from .models import Group, Traveler
 
 
 def hello(request):
@@ -13,217 +15,171 @@ def hello(request):
     })
 
 
-# ===== 问卷（questionnaire）相关逻辑，使用 CSV 作为简易“数据库” =====
+# ===== 问卷（questionnaire）相关逻辑，使用 MySQL =====
 
-DATA_DIR = Path(settings.BASE_DIR) / 'data'
-GROUP_CSV = DATA_DIR / 'groups.csv'
-TRAVELER_CSV = DATA_DIR / 'travelers.csv'
-
-
-def _ensure_data_dir():
-    DATA_DIR.mkdir(exist_ok=True)
-
-
-def _read_csv(path, fieldnames):
-    if not path.exists():
-        return []
-    with path.open(newline='', encoding='utf-8') as f:
-        # 使用文件中第一行作为表头，这样表头只由后端控制，
-        # 页面上不会把表头当成一条可编辑的数据。
-        reader = csv.DictReader(f)
-        rows = []
-        for row in reader:
-            cleaned = {field: (row.get(field, '') or '').strip() for field in fieldnames}
-            rows.append(cleaned)
-    return rows
+def _group_to_dict(g):
+    return {
+        'group_no': g.group_no or '',
+        'agency': g.agency or '',
+        'hotel': g.hotel or '',
+        'region': g.region or '',
+        'people_count': g.people_count or 0,
+        'feedback_count': g.feedback_count or 0,
+        'feedback_rate': g.feedback_rate or '',
+        'start_date': g.start_date.isoformat() if g.start_date else '',
+        'end_date': g.end_date.isoformat() if g.end_date else '',
+    }
 
 
-def _write_csv(path, fieldnames, rows):
-    with path.open('w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
+def _traveler_to_dict(t):
+    return {
+        'group_no': t.group.group_no if t.group_id else '',
+        'guide_language': str(t.guide_language) if t.guide_language is not None else '',
+        'guide_service': str(t.guide_service) if t.guide_service is not None else '',
+        'vehicle_comfort': str(t.vehicle_comfort) if t.vehicle_comfort is not None else '',
+        'vehicle_clean': str(t.vehicle_clean) if t.vehicle_clean is not None else '',
+        'driver_service': str(t.driver_service) if t.driver_service is not None else '',
+        'food_quality': str(t.food_quality) if t.food_quality is not None else '',
+        'restaurant_environment': str(t.restaurant_environment) if t.restaurant_environment is not None else '',
+    }
 
 
-GROUP_FIELDS = [
-    'group_no',          # 团号
-    'agency',            # 地接社
-    'hotel',             # 酒店
-    'region',            # 地区
-    'people_count',      # 人数
-    'feedback_count',    # 意见表回收数量
-    'feedback_rate',     # 回收率
-    'start_date',        # 开始日期
-    'end_date',          # 截止日期
-]
-
-TRAVELER_FIELDS = [
-    'group_no',              # 外键：属于哪个团
-    'guide_language',        # 地陪语言和讲解
-    'guide_service',         # 地陪服务态度
-    'vehicle_comfort',       # 车辆舒适度
-    'vehicle_clean',         # 车辆干净程度
-    'driver_service',        # 司机服务
-    'food_quality',          # 餐饮质量
-    'restaurant_environment' # 餐厅环境
-]
+def _compute_feedback_rate(people_count, feedback_count):
+    try:
+        pc = int(people_count)
+        fc = int(feedback_count)
+        if pc > 0 and 0 <= fc <= pc:
+            return f"{round(fc * 100 / pc, 2)}%"
+    except (ValueError, TypeError):
+        pass
+    return ''
 
 
 def questionnaire(request):
-    _ensure_data_dir()
-
-    # 先读取当前数据
-    groups = _read_csv(GROUP_CSV, GROUP_FIELDS)
-    travelers = _read_csv(TRAVELER_CSV, TRAVELER_FIELDS)
-
-    # 统计每个团关联的旅客数量，用于删除前提示
-    traveler_counts = {}
-    for t in travelers:
-        key = (t.get('group_no') or '').strip()
-        if not key:
-            continue
-        traveler_counts[key] = traveler_counts.get(key, 0) + 1
-
     if request.method == 'POST':
-        entity = request.POST.get('entity')  # 'group' or 'traveler'
-        action = request.POST.get('action')  # 'create' / 'update' / 'delete'
+        entity = request.POST.get('entity')
+        action = request.POST.get('action')
 
         if entity == 'group':
             index_str = request.POST.get('index')
             if action == 'create':
-                # 先取出人数和回收数量，便于计算回收率
-                people_count = request.POST.get('people_count', '').strip()
-                feedback_count = request.POST.get('feedback_count', '').strip()
-                feedback_rate = ''
-                try:
-                    pc = int(people_count)
-                    fc = int(feedback_count)
-                    if pc > 0 and 0 <= fc <= pc:
-                        feedback_rate = f"{round(fc * 100 / pc, 2)}%"
-                except ValueError:
-                    pass
+                group_no = request.POST.get('group_no', '').strip()
+                if group_no and not Group.objects.filter(group_no=group_no).exists():
+                    people_count = request.POST.get('people_count', '').strip()
+                    feedback_count = request.POST.get('feedback_count', '').strip()
+                    start_s = request.POST.get('start_date', '').strip()
+                    end_s = request.POST.get('end_date', '').strip()
+                    start_date = parse_date(start_s) if start_s else None
+                    end_date = parse_date(end_s) if end_s else None
+                    Group.objects.create(
+                        group_no=group_no,
+                        agency=request.POST.get('agency', '').strip(),
+                        hotel=request.POST.get('hotel', '').strip(),
+                        region=request.POST.get('region', '').strip(),
+                        people_count=int(people_count) if people_count.isdigit() else 0,
+                        feedback_count=int(feedback_count) if feedback_count.isdigit() else 0,
+                        feedback_rate=_compute_feedback_rate(people_count, feedback_count),
+                        start_date=start_date,
+                        end_date=end_date,
+                    )
 
-                new_group_no = request.POST.get('group_no', '').strip()
-                existing_nos = {(g.get('group_no') or '').strip() for g in groups if (g.get('group_no') or '').strip()}
-                if new_group_no and new_group_no not in existing_nos:
-                    new_group = {
-                        'group_no': new_group_no,
-                        'agency': request.POST.get('agency', '').strip(),
-                        'hotel': request.POST.get('hotel', '').strip(),
-                        'region': request.POST.get('region', '').strip(),
-                        'people_count': people_count,
-                        'feedback_count': feedback_count,
-                        'feedback_rate': feedback_rate,
-                        'start_date': request.POST.get('start_date', '').strip(),
-                        'end_date': request.POST.get('end_date', '').strip(),
-                    }
-                    groups.append(new_group)
-
-            elif action in ('update', 'delete') and index_str is not None:
+            elif action in ('update', 'delete') and index_str:
                 try:
-                    idx = int(index_str)
-                    if 0 <= idx < len(groups):
-                        if action == 'update':
+                    g = get_object_or_404(Group, pk=int(index_str))
+                    if action == 'update':
+                        group_no = request.POST.get('group_no', '').strip()
+                        if group_no and (group_no == g.group_no or not Group.objects.filter(group_no=group_no).exists()):
                             people_count = request.POST.get('people_count', '').strip()
                             feedback_count = request.POST.get('feedback_count', '').strip()
-                            feedback_rate = ''
-                            try:
-                                pc = int(people_count)
-                                fc = int(feedback_count)
-                                if pc > 0 and 0 <= fc <= pc:
-                                    feedback_rate = f"{round(fc * 100 / pc, 2)}%"
-                            except ValueError:
-                                pass
-
-                            new_group_no = request.POST.get('group_no', '').strip()
-                            existing_nos = {(g.get('group_no') or '').strip() for i, g in enumerate(groups) if i != idx and (g.get('group_no') or '').strip()}
-                            if new_group_no and new_group_no not in existing_nos:
-                                groups[idx] = {
-                                    'group_no': new_group_no,
-                                    'agency': request.POST.get('agency', '').strip(),
-                                    'hotel': request.POST.get('hotel', '').strip(),
-                                    'region': request.POST.get('region', '').strip(),
-                                    'people_count': people_count,
-                                    'feedback_count': feedback_count,
-                                    'feedback_rate': feedback_rate,
-                                    'start_date': request.POST.get('start_date', '').strip(),
-                                    'end_date': request.POST.get('end_date', '').strip(),
-                                }
-                        elif action == 'delete':
-                            # 记录被删团的团号，用于同步删除旅客表中的对应记录
-                            deleted_group_no = groups[idx].get('group_no', '').strip()
-                            groups.pop(idx)
-                            if deleted_group_no:
-                                travelers = [
-                                    t for t in travelers
-                                    if t.get('group_no', '').strip() != deleted_group_no
-                                ]
-                except ValueError:
+                            g.group_no = group_no
+                            g.agency = request.POST.get('agency', '').strip()
+                            g.hotel = request.POST.get('hotel', '').strip()
+                            g.region = request.POST.get('region', '').strip()
+                            g.people_count = int(people_count) if people_count.isdigit() else 0
+                            g.feedback_count = int(feedback_count) if feedback_count.isdigit() else 0
+                            g.feedback_rate = _compute_feedback_rate(people_count, feedback_count)
+                            start_s = request.POST.get('start_date', '').strip()
+                            end_s = request.POST.get('end_date', '').strip()
+                            g.start_date = parse_date(start_s) if start_s else None
+                            g.end_date = parse_date(end_s) if end_s else None
+                            g.save()
+                    elif action == 'delete':
+                        g.delete()
+                except (ValueError, TypeError):
                     pass
 
-            _write_csv(GROUP_CSV, GROUP_FIELDS, groups)
-            _write_csv(TRAVELER_CSV, TRAVELER_FIELDS, travelers)
+            if action == 'create':
+                return redirect('questionnaire_add')
+            return redirect('questionnaire_add')
 
         elif entity == 'traveler':
             index_str = request.POST.get('index')
             if action == 'create':
-                last_group_no = request.POST.get('group_no', '').strip()
-                new_traveler = {
-                    'group_no': last_group_no,
-                    'guide_language': request.POST.get('guide_language', '').strip(),
-                    'guide_service': request.POST.get('guide_service', '').strip(),
-                    'vehicle_comfort': request.POST.get('vehicle_comfort', '').strip(),
-                    'vehicle_clean': request.POST.get('vehicle_clean', '').strip(),
-                    'driver_service': request.POST.get('driver_service', '').strip(),
-                    'food_quality': request.POST.get('food_quality', '').strip(),
-                    'restaurant_environment': request.POST.get('restaurant_environment', '').strip(),
-                }
-                travelers.append(new_traveler)
+                group_no = request.POST.get('group_no', '').strip()
+                group = Group.objects.filter(group_no=group_no).first()
+                if group:
+                    def _dec(s):
+                        try:
+                            return Decimal(s) if s else None
+                        except (ValueError, TypeError):
+                            return None
+                    Traveler.objects.create(
+                        group=group,
+                        guide_language=_dec(request.POST.get('guide_language', '').strip()),
+                        guide_service=_dec(request.POST.get('guide_service', '').strip()),
+                        vehicle_comfort=_dec(request.POST.get('vehicle_comfort', '').strip()),
+                        vehicle_clean=_dec(request.POST.get('vehicle_clean', '').strip()),
+                        driver_service=_dec(request.POST.get('driver_service', '').strip()),
+                        food_quality=_dec(request.POST.get('food_quality', '').strip()),
+                        restaurant_environment=_dec(request.POST.get('restaurant_environment', '').strip()),
+                    )
+                    url = f"{reverse('questionnaire_add')}?last_group_no={group_no}&focus_traveler=1"
+                    return redirect(url)
 
-            elif action in ('update', 'delete') and index_str is not None:
+            elif action in ('update', 'delete') and index_str:
                 try:
-                    idx = int(index_str)
-                    if 0 <= idx < len(travelers):
-                        if action == 'update':
-                            travelers[idx] = {
-                                'group_no': request.POST.get('group_no', '').strip(),
-                                'guide_language': request.POST.get('guide_language', '').strip(),
-                                'guide_service': request.POST.get('guide_service', '').strip(),
-                                'vehicle_comfort': request.POST.get('vehicle_comfort', '').strip(),
-                                'vehicle_clean': request.POST.get('vehicle_clean', '').strip(),
-                                'driver_service': request.POST.get('driver_service', '').strip(),
-                                'food_quality': request.POST.get('food_quality', '').strip(),
-                                'restaurant_environment': request.POST.get('restaurant_environment', '').strip(),
-                            }
-                        elif action == 'delete':
-                            travelers.pop(idx)
-                except ValueError:
+                    t = get_object_or_404(Traveler, pk=int(index_str))
+                    if action == 'update':
+                        group_no = request.POST.get('group_no', '').strip()
+                        grp = Group.objects.filter(group_no=group_no).first()
+                        if grp:
+                            t.group = grp
+                            def _dec(s):
+                                try:
+                                    return Decimal(s) if s else None
+                                except (ValueError, TypeError):
+                                    return None
+                            t.guide_language = _dec(request.POST.get('guide_language', '').strip())
+                            t.guide_service = _dec(request.POST.get('guide_service', '').strip())
+                            t.vehicle_comfort = _dec(request.POST.get('vehicle_comfort', '').strip())
+                            t.vehicle_clean = _dec(request.POST.get('vehicle_clean', '').strip())
+                            t.driver_service = _dec(request.POST.get('driver_service', '').strip())
+                            t.food_quality = _dec(request.POST.get('food_quality', '').strip())
+                            t.restaurant_environment = _dec(request.POST.get('restaurant_environment', '').strip())
+                            t.save()
+                    elif action == 'delete':
+                        t.delete()
+                except (ValueError, TypeError):
                     pass
 
-            _write_csv(TRAVELER_CSV, TRAVELER_FIELDS, travelers)
-
-            # 创建旅客问卷后，带上最近使用的团号和需要聚焦的标记
             if action == 'create':
-                url = f"{reverse('questionnaire_add')}?last_group_no={last_group_no}&focus_traveler=1"
-                return redirect(url)
+                pass  # redirect already done above
+            else:
+                return redirect('questionnaire_add')
 
-        # 其他操作完成后重定向，避免重复提交
-        return redirect('questionnaire_add')
-
-    # GET 请求：展示页面
+    # GET
     last_group_no = request.GET.get('last_group_no', '')
     focus_traveler = request.GET.get('focus_traveler') == '1'
 
-    groups_for_view = []
-    for idx, g in enumerate(groups):
-        key = (g.get('group_no') or '').strip()
-        count = traveler_counts.get(key, 0)
-        groups_for_view.append((idx, g, count))
+    groups_qs = Group.objects.all().order_by('group_no').annotate(traveler_count=Count('travelers'))
+    groups_for_view = [(g.id, _group_to_dict(g), g.traveler_count) for g in groups_qs]
+
+    travelers_qs = Traveler.objects.select_related('group').all().order_by('id')
+    travelers = [(t.id, _traveler_to_dict(t)) for t in travelers_qs]
 
     context = {
-        'groups': groups_for_view,        # [(index, group_dict, traveler_count), ...]
-        'travelers': list(enumerate(travelers)),  # [(index, traveler_dict), ...]
+        'groups': groups_for_view,
+        'travelers': travelers,
         'last_group_no': last_group_no,
         'focus_traveler': focus_traveler,
     }
@@ -231,195 +187,54 @@ def questionnaire(request):
 
 
 def questionnaire_view(request):
-    _ensure_data_dir()
-
-    groups = _read_csv(GROUP_CSV, GROUP_FIELDS)
-    travelers = _read_csv(TRAVELER_CSV, TRAVELER_FIELDS)
-
-    # 构造团号 -> 团信息 映射，方便在旅客表中展示地区等
-    group_map = {}
-    for g in groups:
-        key = (g.get('group_no') or '').strip()
-        if key:
-            group_map[key] = g
-
-    METRIC_KEYS = ['guide_language', 'guide_service', 'vehicle_comfort', 'vehicle_clean', 'driver_service', 'food_quality', 'restaurant_environment']
-    enriched_travelers = []
-    for t in travelers:
-        group_no = (t.get('group_no') or '').strip()
-        g = group_map.get(group_no, {})
-        s = 0.0
-        valid = False
-        for k in METRIC_KEYS:
-            try:
-                v = float(t.get(k) or 0)
-            except ValueError:
-                v = 0
-            if v:
-                valid = True
-            s += v
-        composite_score = round(s / len(METRIC_KEYS), 2) if valid else 0.0
-        enriched_travelers.append({
-            'group_no': group_no,
-            'region': g.get('region', ''),
-            'agency': g.get('agency', ''),
-            'hotel': g.get('hotel', ''),
-            'start_date': g.get('start_date', ''),
-            'end_date': g.get('end_date', ''),
-            'guide_language': t.get('guide_language', ''),
-            'guide_service': t.get('guide_service', ''),
-            'vehicle_comfort': t.get('vehicle_comfort', ''),
-            'vehicle_clean': t.get('vehicle_clean', ''),
-            'driver_service': t.get('driver_service', ''),
-            'food_quality': t.get('food_quality', ''),
-            'restaurant_environment': t.get('restaurant_environment', ''),
-            'composite_score': composite_score,
-        })
-
-    def _calc_mean_std(values):
-        if not values:
-            return 0.0, 0.0
-        n = len(values)
-        mean_val = sum(values) / n
-        var = sum((v - mean_val) ** 2 for v in values) / n
-        return round(mean_val, 2), round(var ** 0.5, 2)
-
-    # 需要统计的各项评分 + 总分
-    metric_defs = [
-        ('guide_language', '地陪语言和讲解'),
-        ('guide_service', '地陪服务态度'),
-        ('vehicle_comfort', '车辆舒适度'),
-        ('vehicle_clean', '车辆干净程度'),
-        ('driver_service', '司机服务'),
-        ('food_quality', '餐饮质量'),
-        ('restaurant_environment', '餐厅环境'),
-    ]
-
-    # 多团统计：每个团的总分均值/标准差 + 回收率，以及图表所需的各项均值/标准差
-    group_stats = []  # 用于表格展示
-    chart_stats = {}  # 用于前端折线图：每个团 -> 各指标 mean/std
-
-    # 收集所有有团号的团
-    all_group_nos = sorted({(g.get('group_no') or '').strip() for g in groups if (g.get('group_no') or '').strip()})
-
-    for gno in all_group_nos:
-        base_info = group_map.get(gno, {})
-        group_travelers = [t for t in enriched_travelers if (t.get('group_no') or '').strip() == gno]
-
-        # 各单项
-        metrics_for_group = {}
-        for key, label in metric_defs:
-            vals = []
-            for t in group_travelers:
-                try:
-                    v = float(t.get(key) or 0)
-                except ValueError:
-                    continue
-                vals.append(v)
-            mean_v, std_v = _calc_mean_std(vals)
-            metrics_for_group[key] = {
-                'label': label,
-                'mean': mean_v,
-                'std': std_v,
-            }
-
-        # 综合得分 = 总分 / 小项数（7 项）
-        total_vals = []
-        for t in group_travelers:
-            s = 0.0
-            valid = False
-            for key, _ in metric_defs:
-                try:
-                    v = float(t.get(key) or 0)
-                except ValueError:
-                    v = 0
-                if v:
-                    valid = True
-                s += v
-            if valid:
-                total_vals.append(s / len(metric_defs))  # 综合得分
-        total_mean, total_std = _calc_mean_std(total_vals)
-
-        feedback_rate = base_info.get('feedback_rate', '')
-
-        # 团列表展示：基础信息 + 各小项平均分 + 综合得分
-        group_entry = {
-            'group_no': gno,
-            'region': base_info.get('region', ''),
-            'agency': base_info.get('agency', ''),
-            'hotel': base_info.get('hotel', ''),
-            'start_date': base_info.get('start_date', ''),
-            'end_date': base_info.get('end_date', ''),
-            'feedback_rate': feedback_rate,
-            'total_mean': total_mean,
-            'total_std': total_std,
-        }
-
-        # 将每个小项的平均分放进 group_stats，方便模板直接展示
-        for key, _label in metric_defs:
-            metric_info = metrics_for_group.get(key, {})
-            group_entry[f'{key}_mean'] = metric_info.get('mean', 0.0)
-
-        group_stats.append(group_entry)
-
-        chart_stats[gno] = {
-            'group_no': gno,
-            'region': base_info.get('region', ''),
-            'feedback_rate': feedback_rate,
-            'metrics': metrics_for_group,
-            'total': {
-                'label': '综合得分',
-                'mean': total_mean,
-                'std': total_std,
-            },
-        }
-
+    # 页面仅负责渲染，数据由前端 API 动态加载
     context = {
-        'groups': groups,
+        'groups': [],
         'travelers': [],
         'group_stats': [],
     }
     return render(request, 'questionnaire_view.html', context)
 
 
+METRIC_KEYS = ['guide_language', 'guide_service', 'vehicle_comfort', 'vehicle_clean', 'driver_service', 'food_quality', 'restaurant_environment']
+
+
 def _load_view_data():
-    """加载问卷查看所需数据：enriched_travelers, group_stats, metric_defs"""
-    _ensure_data_dir()
-    groups = _read_csv(GROUP_CSV, GROUP_FIELDS)
-    travelers = _read_csv(TRAVELER_CSV, TRAVELER_FIELDS)
-    group_map = {(g.get('group_no') or '').strip(): g for g in groups if (g.get('group_no') or '').strip()}
-    METRIC_KEYS = ['guide_language', 'guide_service', 'vehicle_comfort', 'vehicle_clean', 'driver_service', 'food_quality', 'restaurant_environment']
+    """从 MySQL 加载问卷查看所需数据：enriched_travelers, group_stats"""
+    groups = list(Group.objects.all().order_by('group_no'))
+    group_map = {g.group_no: g for g in groups if g.group_no}
+    travelers_qs = Traveler.objects.select_related('group').all()
+
     enriched_travelers = []
-    for t in travelers:
-        group_no = (t.get('group_no') or '').strip()
-        g = group_map.get(group_no, {})
-        s = 0.0
-        valid = False
+    for t in travelers_qs:
+        g = t.group
+        group_no = g.group_no if g else ''
+        scores = []
         for k in METRIC_KEYS:
+            v = getattr(t, k)
             try:
-                v = float(t.get(k) or 0)
-            except ValueError:
-                v = 0
-            if v:
-                valid = True
-            s += v
-        composite_score = round(s / len(METRIC_KEYS), 2) if valid else 0.0
+                scores.append(float(v) if v is not None else 0)
+            except (TypeError, ValueError):
+                scores.append(0)
+        valid = any(scores)
+        composite_score = round(sum(scores) / len(scores), 2) if valid else 0.0
         enriched_travelers.append({
             'group_no': group_no,
-            'region': g.get('region', ''),
-            'agency': g.get('agency', ''),
-            'hotel': g.get('hotel', ''),
-            'start_date': g.get('start_date', ''),
-            'end_date': g.get('end_date', ''),
-            'guide_language': t.get('guide_language', ''),
-            'guide_service': t.get('guide_service', ''),
-            'vehicle_comfort': t.get('vehicle_comfort', ''),
-            'vehicle_clean': t.get('vehicle_clean', ''),
-            'driver_service': t.get('driver_service', ''),
-            'food_quality': t.get('food_quality', ''),
-            'restaurant_environment': t.get('restaurant_environment', ''),
+            'region': g.region or '' if g else '',
+            'agency': g.agency or '' if g else '',
+            'hotel': g.hotel or '' if g else '',
+            'start_date': g.start_date.isoformat() if g and g.start_date else '',
+            'end_date': g.end_date.isoformat() if g and g.end_date else '',
+            'guide_language': str(t.guide_language) if t.guide_language is not None else '',
+            'guide_service': str(t.guide_service) if t.guide_service is not None else '',
+            'vehicle_comfort': str(t.vehicle_comfort) if t.vehicle_comfort is not None else '',
+            'vehicle_clean': str(t.vehicle_clean) if t.vehicle_clean is not None else '',
+            'driver_service': str(t.driver_service) if t.driver_service is not None else '',
+            'food_quality': str(t.food_quality) if t.food_quality is not None else '',
+            'restaurant_environment': str(t.restaurant_environment) if t.restaurant_environment is not None else '',
             'composite_score': composite_score,
         })
+
     metric_defs = [
         ('guide_language', '地陪语言'), ('guide_service', '服务态度'), ('vehicle_comfort', '车辆舒适度'),
         ('vehicle_clean', '车辆干净'), ('driver_service', '司机服务'), ('food_quality', '餐饮质量'),
@@ -432,27 +247,28 @@ def _load_view_data():
         return round(sum(values) / len(values), 2)
 
     group_stats = []
-    all_group_nos = sorted({(g.get('group_no') or '').strip() for g in groups if (g.get('group_no') or '').strip()})
-    for gno in all_group_nos:
-        base_info = group_map.get(gno, {})
-        group_travelers = [t for t in enriched_travelers if (t.get('group_no') or '').strip() == gno]
+    for g in groups:
+        gno = g.group_no or ''
+        if not gno:
+            continue
+        group_travelers = [e for e in enriched_travelers if e.get('group_no') == gno]
         metrics_for_group = {}
-        for key, label in metric_defs:
+        for key, _ in metric_defs:
             vals = []
-            for t in group_travelers:
+            for e in group_travelers:
                 try:
-                    vals.append(float(t.get(key) or 0))
-                except ValueError:
+                    vals.append(float(e.get(key) or 0))
+                except (ValueError, TypeError):
                     pass
-            metrics_for_group[key] = {'label': label, 'mean': _calc_mean(vals)}
+            metrics_for_group[key] = {'label': _, 'mean': _calc_mean(vals)}
         total_vals = []
-        for t in group_travelers:
+        for e in group_travelers:
             s = 0.0
             valid = False
             for key, _ in metric_defs:
                 try:
-                    v = float(t.get(key) or 0)
-                except ValueError:
+                    v = float(e.get(key) or 0)
+                except (ValueError, TypeError):
                     v = 0
                 if v:
                     valid = True
@@ -461,15 +277,19 @@ def _load_view_data():
                 total_vals.append(s / len(metric_defs))
         total_mean = _calc_mean(total_vals)
         group_entry = {
-            'group_no': gno, 'region': base_info.get('region', ''),
-            'agency': base_info.get('agency', ''), 'hotel': base_info.get('hotel', ''),
-            'start_date': base_info.get('start_date', ''), 'end_date': base_info.get('end_date', ''),
-            'feedback_rate': base_info.get('feedback_rate', ''),
+            'group_no': gno,
+            'region': g.region or '',
+            'agency': g.agency or '',
+            'hotel': g.hotel or '',
+            'start_date': g.start_date.isoformat() if g.start_date else '',
+            'end_date': g.end_date.isoformat() if g.end_date else '',
+            'feedback_rate': g.feedback_rate or '',
             'total_mean': total_mean,
         }
         for key, _ in metric_defs:
             group_entry[f'{key}_mean'] = metrics_for_group[key]['mean']
         group_stats.append(group_entry)
+
     return enriched_travelers, group_stats
 
 
@@ -484,7 +304,6 @@ def view_data_api(request):
     sort_key = request.GET.get('sort', '')
     order = request.GET.get('order', 'asc')
 
-    # group_by: 按地接社/地区/酒店聚合
     if table == 'group_by':
         by = request.GET.get('by', 'agency')
         sort_key = request.GET.get('sort', '')
@@ -498,7 +317,6 @@ def view_data_api(request):
         label_map = {'agency': '地接社', 'region': '地区', 'hotel': '酒店'}
         label = label_map.get(by, '地接社')
 
-        # 日期筛选：与统计相同的逻辑
         filtered_stats = [g for g in group_stats if
             (not start_from or (g.get('start_date') or '') >= start_from) and
             (not start_to or (g.get('start_date') or '') <= start_to) and
@@ -524,7 +342,6 @@ def view_data_api(request):
                 'avg_composite': round(v['total'] / v['count'], 2),
                 **ms,
             })
-        # 排序（与 group_stats / travelers 同样逻辑）
         sort_col_map = {
             'key': 'key', 'count': 'count', 'avg_composite': 'avg_composite',
             'guide_language_mean': 'guide_language_mean', 'guide_service_mean': 'guide_service_mean',
@@ -548,7 +365,6 @@ def view_data_api(request):
             rows = sorted(rows, key=lambda r: _sort_val(r, col), reverse=rev)
         return JsonResponse({'rows': rows, 'total': len(rows)})
 
-    # travelers 表格
     if table == 'travelers':
         rows = enriched_travelers
         kw_group = (request.GET.get('group', '') or '').strip().lower()
@@ -580,13 +396,12 @@ def view_data_api(request):
         col = sort_col_map.get(sort_key, '')
         if col:
             rev = order != 'asc'
-            rows = sorted(rows, key=lambda r: (float(r.get(col)) if isinstance(r.get(col), (int, float)) or (isinstance(r.get(col), str) and r.get(col).replace('.','',1).isdigit()) else r.get(col) or ''), reverse=rev)
+            rows = sorted(rows, key=lambda r: (float(r.get(col)) if isinstance(r.get(col), (int, float)) or (isinstance(r.get(col), str) and r.get(col).replace('.', '', 1).isdigit()) else r.get(col) or ''), reverse=rev)
         total = len(rows)
         start = (page - 1) * page_size
         page_rows = rows[start:start + page_size]
         return JsonResponse({'rows': page_rows, 'total': total, 'page': page, 'total_pages': max(1, (total + page_size - 1) // page_size)})
 
-    # group_stats 表格
     if table == 'group_stats':
         rows = group_stats
         kw_group = (request.GET.get('group_no', '') or '').strip().lower()
@@ -618,7 +433,8 @@ def view_data_api(request):
         col = sort_col_map.get(sort_key, '')
         if col:
             def _sort_val(v):
-                if v is None or v == '': return 0
+                if v is None or v == '':
+                    return 0
                 s = str(v).replace('%', '')
                 try:
                     return float(s)
@@ -632,4 +448,3 @@ def view_data_api(request):
         return JsonResponse({'rows': page_rows, 'total': total, 'page': page, 'total_pages': max(1, (total + page_size - 1) // page_size)})
 
     return JsonResponse({'error': 'invalid table'}, status=400)
-
