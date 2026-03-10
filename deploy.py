@@ -35,8 +35,7 @@ def main():
 cd {REMOTE_PROJECT_DIR} && \
 git pull && \
 source ~/.bashrc && \
-conda activate {REMOTE_CONDA_ENV} && \
-sudo systemctl restart {GUNICORN_SERVICE}
+conda activate {REMOTE_CONDA_ENV}
 """.strip().replace("\n", " ")
 
     # 注意：需要本机已经配置好 SSH 免密或能输入密码
