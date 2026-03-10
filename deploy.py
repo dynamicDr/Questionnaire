@@ -27,20 +27,21 @@ def main():
     run(f'git commit -m auto')
     run("git push")
 
-    # 2. 远程执行：git pull + conda 激活 + 重启 gunicorn
-    print("\n=== 登录服务器并更新部署 ===")
+    # 2. 远程执行：git pull + conda 激活，然后停留在服务器命令行
+    print("\n=== 登录服务器并更新部署（并停留在远程 shell） ===")
     remote_cmd = f"""
 cd {REMOTE_PROJECT_DIR} && \
-git stash && \  
+git stash && \
 git pull && \
 source ~/.bashrc && \
-conda activate {REMOTE_CONDA_ENV}
+conda activate {REMOTE_CONDA_ENV} && \
+exec bash --login
 """.strip().replace("\n", " ")
 
     # 注意：需要本机已经配置好 SSH 免密或能输入密码
     run(f'ssh {REMOTE_HOST} "{remote_cmd}"')
 
-    print("\n=== 部署完成 ===")
+    print("\n=== 已登录到远程服务器 shell，可继续操作 ===")
 
 
 if __name__ == "__main__":
