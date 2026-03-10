@@ -48,7 +48,16 @@ def main():
     run("git add .")
     run('git commit -m auto')
     run_with_retry("git push")
-    run(f'ssh {REMOTE_HOST}')
+    # 进入服务器后执行一系列更新命令，并停留在远程 shell 中
+    remote_cmd = f"""
+cd {REMOTE_PROJECT_DIR} && \
+source ~/.bashrc && \
+conda activate {REMOTE_CONDA_ENV} && \
+git stash && \
+git pull && \
+exec bash --login
+""".strip().replace("\n", " ")
+    run(f'ssh {REMOTE_HOST} "{remote_cmd}"')
 
 
 if __name__ == "__main__":
