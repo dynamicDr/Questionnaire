@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block title %}信息修改{% endblock %}
+{% block extra_css %}
+table { border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 14px; }
+th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+th { background: var(--side-bg); }
+form.inline { display: inline-block; margin: 0; }
+input[type="text"], input[type="number"], input[type="date"], input[type="month"] { width: 120px; box-sizing: border-box; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; }
+.submit-btn { padding: 6px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; border: 1px solid var(--border); background: var(--side-bg); color: var(--text); }
+.submit-btn:hover { background: var(--side-border); }
+.pager { margin-top: 10px; }
+.pager button { margin-right: 8px; padding: 4px 10px; }
+.group-delete-btn { background: #dc2626; color: #fff; border-color: #b91c1c; }
+.group-delete-btn:hover { background: #b91c1c; }
+.confirm-overlay { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.confirm-modal { background: #fff; padding: 24px; border-radius: 8px; max-width: 480px; width: 90%; border: 1px solid var(--border); }
+.confirm-modal h4 { margin: 0 0 12px 0; }
+.confirm-modal p { margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; }
+.confirm-modal-btns { display: flex; gap: 12px; justify-content: flex-end; }
+.confirm-modal-btns .confirm-delete-btn { background: #dc2626; color: #fff; border-color: #b91c1c; }
+.confirm-modal-btns .confirm-delete-btn:hover { background: #b91c1c; }
+.tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.tab-btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; color: var(--text-muted); }
+.tab-btn.active { background: rgba(16,163,127,.1); color: var(--accent); border-color: rgba(16,163,127,.25); }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+{% endblock %}
+{% block content %}
+<h1>信息修改</h1>
+
+<div id="delete-group-modal" class="confirm-overlay" style="display: none;">
+    <div class="confirm-modal">
+        <h4>确认删除团</h4>
+        <p id="delete-group-message"></p>
+        <div class="confirm-modal-btns">
+            <button type="button" class="submit-btn" id="delete-group-cancel">取消</button>
+            <button type="button" class="submit-btn confirm-delete-btn" id="delete-group-confirm">确认删除</button>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h3>团列表</h3>
+    <table id="group-table">
+        <thead>
+        <tr>
+            <th>序号</th>
+            <th>团号</th>
+            <th>人数</th>
+            <th>意见表回收数量</th>
+            <th>回收率</th>
+            <th>日期</th>
+            <th>操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for idx, g, traveler_count in groups %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>
+                    <form method="post" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="entity" value="group">
+                        <input type="hidden" name="action" value="update">
+                        <input type="hidden" name="index" value="{{ idx }}">
+                        <input type="text" name="group_no" value="{{ g.group_no }}">
+                </td>
+                <td><input type="number" name="people_count" value="{{ g.people_count }}"></td>
+                <td><input type="number" name="feedback_count" value="{{ g.feedback_count }}"></td>
+                <td>{{ g.feedback_rate }}</td>
+                <td><input type="month" name="date" value="{{ g.date }}"></td>
+                <td>
+                        <button type="submit" class="submit-btn">保存</button>
+                    </form>
+                    <form method="post" class="inline group-delete-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="entity" value="group">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="index" value="{{ idx }}">
+                        <button type="button" class="submit-btn group-delete-btn" data-traveler-count="{{ traveler_count }}">删除</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="8">暂无团数据。</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <div id="group-pager" class="pager"></div>
+</div>
+
+<div class="section">
+    <h3>旅客问卷列表</h3>
+
+    <div class="tabs">
+        <button type="button" class="tab-btn active" data-tab="tab-local-traveler">地陪</button>
+        <button type="button" class="tab-btn" data-tab="tab-full-traveler">全陪</button>
+    </div>
+
+    <div id="tab-local-traveler" class="tab-pane active">
+    <table id="traveler-table-add">
+        <thead>
+        <tr>
+            <th>序号</th>
+            <th>所属团号</th>
+            <th>地陪语言和讲解</th>
+            <th>地陪服务态度</th>
+            <th>车辆舒适度</th>
+            <th>车辆干净程度</th>
+            <th>司机服务</th>
+            <th>餐饮质量</th>
+            <th>餐厅环境</th>
+            <th>操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for idx, t in travelers %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>
+                    <form method="post" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="entity" value="traveler">
+                        <input type="hidden" name="action" value="update">
+                        <input type="hidden" name="index" value="{{ idx }}">
+                        <input type="text" name="group_no" value="{{ t.group_no }}">
+                </td>
+                <td><input type="text" name="guide_language" value="{{ t.guide_language }}"></td>
+                <td><input type="text" name="guide_service" value="{{ t.guide_service }}"></td>
+                <td><input type="text" name="vehicle_comfort" value="{{ t.vehicle_comfort }}"></td>
+                <td><input type="text" name="vehicle_clean" value="{{ t.vehicle_clean }}"></td>
+                <td><input type="text" name="driver_service" value="{{ t.driver_service }}"></td>
+                <td><input type="text" name="food_quality" value="{{ t.food_quality }}"></td>
+                <td><input type="text" name="restaurant_environment" value="{{ t.restaurant_environment }}"></td>
+                <td>
+                        <button type="submit" class="submit-btn">保存</button>
+                    </form>
+                    <form method="post" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="entity" value="traveler">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="index" value="{{ idx }}">
+                        <button type="submit" class="submit-btn">删除</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="10">暂无旅客问卷数据。</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <div id="traveler-add-pager" class="pager"></div>
+    </div>
+
+    <div id="tab-full-traveler" class="tab-pane">
+    <table id="full-escort-table-add">
+        <thead>
+        <tr>
+            <th>序号</th>
+            <th>所属团号</th>
+            <th>节奏</th>
+            <th>讲解</th>
+            <th>服务</th>
+            <th>设计</th>
+            <th>期望</th>
+            <th>推荐</th>
+            <th>总评</th>
+            <th>操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for idx, f in full_escorts %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>
+                    <form method="post" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="entity" value="full_escort">
+                        <input type="hidden" name="action" value="update">
+                        <input type="hidden" name="index" value="{{ idx }}">
+                        <input type="text" name="group_no" value="{{ f.group_no }}">
+                </td>
+                <td><input type="text" name="pace" value="{{ f.pace }}"></td>
+                <td><input type="text" name="explanation" value="{{ f.explanation }}"></td>
+                <td><input type="text" name="service" value="{{ f.service }}"></td>
+                <td><input type="text" name="design" value="{{ f.design }}"></td>
+                <td><input type="text" name="expectation" value="{{ f.expectation }}"></td>
+                <td><input type="text" name="recommendation" value="{{ f.recommendation }}"></td>
+                <td><input type="text" name="overall" value="{{ f.overall }}"></td>
+                <td>
+                        <button type="submit" class="submit-btn">保存</button>
+                    </form>
+                    <form method="post" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="entity" value="full_escort">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="index" value="{{ idx }}">
+                        <button type="submit" class="submit-btn">删除</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="10">暂无全陪问卷数据。</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <div id="full-escort-add-pager" class="pager"></div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const modal = document.getElementById('delete-group-modal');
+        const messageEl = document.getElementById('delete-group-message');
+        const cancelBtn = document.getElementById('delete-group-cancel');
+        const confirmBtn = document.getElementById('delete-group-confirm');
+        let pendingForm = null;
+
+        document.querySelectorAll('.group-delete-btn').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                const count = parseInt(this.getAttribute('data-traveler-count') || '0', 10);
+                let msg;
+                if (count > 0) {
+                    msg = `该团当前共有 ${count} 条旅客问卷记录。删除该团将同时删除这 ${count} 条旅客信息。是否确认删除？`;
+                } else {
+                    msg = '该团下目前没有旅客问卷记录。确认删除该团吗？';
+                }
+                messageEl.textContent = msg;
+                pendingForm = this.closest('form');
+                modal.style.display = 'flex';
+            });
+        });
+
+        cancelBtn.addEventListener('click', function () {
+            modal.style.display = 'none';
+            pendingForm = null;
+        });
+        confirmBtn.addEventListener('click', function () {
+            if (pendingForm) pendingForm.submit();
+            modal.style.display = 'none';
+            pendingForm = null;
+        });
+    })();
+
+    (function () {
+        function setupPager(tableId, pagerId) {
+            const table = document.getElementById(tableId);
+            const pager = document.getElementById(pagerId);
+            if (!table || !pager) return;
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const PAGE_SIZE = 20;
+            let currentPage = 1;
+
+            function renderPage() {
+                const total = rows.length;
+                const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+                if (currentPage > totalPages) currentPage = totalPages;
+                const start = (currentPage - 1) * PAGE_SIZE;
+                const pageRows = rows.slice(start, start + PAGE_SIZE);
+                tbody.innerHTML = '';
+                pageRows.forEach(r => tbody.appendChild(r));
+                pager.innerHTML = '';
+
+                const info = document.createElement('span');
+                info.textContent = `第 ${currentPage} / ${totalPages} 页（共 ${total} 条）`;
+                const prev = document.createElement('button');
+                prev.textContent = '上一页';
+                prev.disabled = currentPage <= 1;
+                prev.addEventListener('click', () => { if (currentPage > 1) { currentPage -= 1; renderPage(); } });
+                const next = document.createElement('button');
+                next.textContent = '下一页';
+                next.disabled = currentPage >= totalPages;
+                next.addEventListener('click', () => { if (currentPage < totalPages) { currentPage += 1; renderPage(); } });
+                pager.appendChild(prev);
+                pager.appendChild(next);
+                pager.appendChild(info);
+            }
+
+            renderPage();
+        }
+
+        setupPager('group-table', 'group-pager');
+        setupPager('traveler-table-add', 'traveler-add-pager');
+        setupPager('full-escort-table-add', 'full-escort-add-pager');
+    })();
+
+    // 地陪/全陪标签页切换（旅客问卷）
+    (function () {
+        const tabButtons = Array.from(document.querySelectorAll('.tabs .tab-btn'));
+        const panes = {
+            'tab-local-traveler': document.getElementById('tab-local-traveler'),
+            'tab-full-traveler': document.getElementById('tab-full-traveler'),
+        };
+        function activate(id) {
+            tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === id));
+            Object.keys(panes).forEach(key => {
+                if (panes[key]) panes[key].classList.toggle('active', key === id);
+            });
+        }
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', function () {
+                activate(this.dataset.tab);
+            });
+        });
+        // 根据后端传入的焦点标志，决定初始激活的标签
+        const focusFull = '{{ focus_full_escort|yesno:"true,false" }}' === 'true';
+        if (focusFull) {
+            activate('tab-full-traveler');
+        } else {
+            activate('tab-local-traveler');
+        }
+    })();
+</script>
+{% endblock %}

@@ -47,20 +47,12 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         </label>
         <span style="flex-basis: 100%; height: 0; display: block;"></span>
         <label>
-            开始日期 从：
-            <span class="date-input-wrap"><input type="date" id="group-filter-start-from" class="small-input"><span class="date-placeholder">不限</span></span>
+            日期 从：
+            <span class="date-input-wrap"><input type="month" id="group-filter-date-from" class="small-input"><span class="date-placeholder">不限</span></span>
         </label>
         <label>
             到：
-            <span class="date-input-wrap"><input type="date" id="group-filter-start-to" class="small-input"><span class="date-placeholder">不限</span></span>
-        </label>
-        <label>
-            截止日期 从：
-            <span class="date-input-wrap"><input type="date" id="group-filter-end-from" class="small-input"><span class="date-placeholder">不限</span></span>
-        </label>
-        <label>
-            到：
-            <span class="date-input-wrap"><input type="date" id="group-filter-end-to" class="small-input"><span class="date-placeholder">不限</span></span>
+            <span class="date-input-wrap"><input type="month" id="group-filter-date-to" class="small-input"><span class="date-placeholder">不限</span></span>
         </label>
         <button type="button" id="group-filter-clear">清除所有条件</button>
     </div>
@@ -73,8 +65,7 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
             <th data-key="region">地区</th>
             <th data-key="agency">地接社</th>
             <th data-key="hotel">酒店</th>
-            <th data-key="start_date">开始日期</th>
-            <th data-key="end_date">截止日期</th>
+            <th data-key="date">日期</th>
             <th data-key="feedback_rate">回收率</th>
             <th data-key="guide_language_mean">地陪语言</th>
             <th data-key="guide_service_mean">服务态度</th>
@@ -87,7 +78,7 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         </tr>
         </thead>
         <tbody>
-        <tr><td colspan="15" class="loading">加载中...</td></tr>
+        <tr><td colspan="14" class="loading">加载中...</td></tr>
         </tbody>
     </table>
     <div id="group-stats-pager" class="pager"></div>
@@ -110,10 +101,8 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         <label> 查看平均分数</label>
     </p>
     <div class="filters" style="margin-bottom: 10px;">
-        <label>开始日期 从：<span class="date-input-wrap"><input type="date" id="group-by-start-from" class="small-input"><span class="date-placeholder">不限</span></span></label>
-        <label>到：<span class="date-input-wrap"><input type="date" id="group-by-start-to" class="small-input"><span class="date-placeholder">不限</span></span></label>
-        <label>截止日期 从：<span class="date-input-wrap"><input type="date" id="group-by-end-from" class="small-input"><span class="date-placeholder">不限</span></span></label>
-        <label>到：<span class="date-input-wrap"><input type="date" id="group-by-end-to" class="small-input"><span class="date-placeholder">不限</span></span></label>
+        <label>日期 从：<span class="date-input-wrap"><input type="month" id="group-by-date-from" class="small-input"><span class="date-placeholder">不限</span></span></label>
+        <label>到：<span class="date-input-wrap"><input type="month" id="group-by-date-to" class="small-input"><span class="date-placeholder">不限</span></span></label>
         <button type="button" id="group-by-filter-clear">清除所有条件</button>
     </div>
     <table id="group-by-table">
@@ -195,10 +184,8 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         const filterRegion = document.getElementById('group-filter-region');
         const filterAgency = document.getElementById('group-filter-agency');
         const filterHotel = document.getElementById('group-filter-hotel');
-        const filterStartFrom = document.getElementById('group-filter-start-from');
-        const filterStartTo = document.getElementById('group-filter-start-to');
-        const filterEndFrom = document.getElementById('group-filter-end-from');
-        const filterEndTo = document.getElementById('group-filter-end-to');
+        const filterDateFrom = document.getElementById('group-filter-date-from');
+        const filterDateTo = document.getElementById('group-filter-date-to');
         const filterClearBtn = document.getElementById('group-filter-clear');
         let currentSortKey = null;
         let currentSortAsc = true;
@@ -210,10 +197,8 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
             if (filterRegion && filterRegion.value) p.region = filterRegion.value;
             if (filterAgency && filterAgency.value) p.agency = filterAgency.value;
             if (filterHotel && filterHotel.value) p.hotel = filterHotel.value;
-            if (filterStartFrom && filterStartFrom.value) p.start_from = filterStartFrom.value;
-            if (filterStartTo && filterStartTo.value) p.start_to = filterStartTo.value;
-            if (filterEndFrom && filterEndFrom.value) p.end_from = filterEndFrom.value;
-            if (filterEndTo && filterEndTo.value) p.end_to = filterEndTo.value;
+            if (filterDateFrom && filterDateFrom.value) p.date_from = filterDateFrom.value;
+            if (filterDateTo && filterDateTo.value) p.date_to = filterDateTo.value;
             if (currentSortKey) p.sort = currentSortKey;
             p.order = currentSortAsc ? 'asc' : 'desc';
             return p;
@@ -221,7 +206,7 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
 
         function renderRow(g) {
             const tr = document.createElement('tr');
-            tr.innerHTML = '<td>' + (g.group_no || '') + '</td><td>' + (g.region || '') + '</td><td>' + (g.agency || '') + '</td><td>' + (g.hotel || '') + '</td><td>' + (g.start_date || '') + '</td><td>' + (g.end_date || '') + '</td><td>' + (g.feedback_rate || '') + '</td><td>' + (g.guide_language_mean || '') + '</td><td>' + (g.guide_service_mean || '') + '</td><td>' + (g.vehicle_comfort_mean || '') + '</td><td>' + (g.vehicle_clean_mean || '') + '</td><td>' + (g.driver_service_mean || '') + '</td><td>' + (g.food_quality_mean || '') + '</td><td>' + (g.restaurant_environment_mean || '') + '</td><td>' + (g.total_mean || '') + '</td>';
+            tr.innerHTML = '<td>' + (g.group_no || '') + '</td><td>' + (g.region || '') + '</td><td>' + (g.agency || '') + '</td><td>' + (g.hotel || '') + '</td><td>' + (g.date || g.end_date || '') + '</td><td>' + (g.feedback_rate || '') + '</td><td>' + (g.guide_language_mean || '') + '</td><td>' + (g.guide_service_mean || '') + '</td><td>' + (g.vehicle_comfort_mean || '') + '</td><td>' + (g.vehicle_clean_mean || '') + '</td><td>' + (g.driver_service_mean || '') + '</td><td>' + (g.food_quality_mean || '') + '</td><td>' + (g.restaurant_environment_mean || '') + '</td><td>' + (g.total_mean || '') + '</td>';
             return tr;
         }
 
@@ -233,11 +218,11 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         }
 
         function load() {
-            tbody.innerHTML = '<tr><td colspan="15" class="loading">加载中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="14" class="loading">加载中...</td></tr>';
             fetchApi(getParams()).then(data => {
                 tbody.innerHTML = '';
                 if (!data.rows || data.rows.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="15">暂无团数据。</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="14">暂无团数据。</td></tr>';
                 } else {
                     data.rows.forEach(g => tbody.appendChild(renderRow(g)));
                 }
@@ -263,18 +248,16 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         }
 
         function onFilter() { currentPage = 1; load(); }
-        [filterGroupNo, filterRegion, filterAgency, filterHotel, filterStartFrom, filterStartTo, filterEndFrom, filterEndTo].forEach(el => {
-            if (el) { el.addEventListener('input', onFilter); if (el.type === 'date') el.addEventListener('change', onFilter); }
+        [filterGroupNo, filterRegion, filterAgency, filterHotel, filterDateFrom, filterDateTo].forEach(el => {
+            if (el) { el.addEventListener('input', onFilter); if (el.type === 'date' || el.type === 'month') el.addEventListener('change', onFilter); }
         });
         if (filterClearBtn) filterClearBtn.addEventListener('click', () => {
             if (filterGroupNo) filterGroupNo.value = '';
             if (filterRegion) filterRegion.value = '';
             if (filterAgency) filterAgency.value = '';
             if (filterHotel) filterHotel.value = '';
-            if (filterStartFrom) filterStartFrom.value = '';
-            if (filterStartTo) filterStartTo.value = '';
-            if (filterEndFrom) filterEndFrom.value = '';
-            if (filterEndTo) filterEndTo.value = '';
+            if (filterDateFrom) filterDateFrom.value = '';
+            if (filterDateTo) filterDateTo.value = '';
             if (window.updateDatePlaceholders) window.updateDatePlaceholders();
             onFilter();
         });
@@ -390,20 +373,16 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
         const table = document.getElementById('group-by-table');
         const select = document.getElementById('group-by-select');
         const tbody = document.querySelector('#group-by-table tbody');
-        const filterStartFrom = document.getElementById('group-by-start-from');
-        const filterStartTo = document.getElementById('group-by-start-to');
-        const filterEndFrom = document.getElementById('group-by-end-from');
-        const filterEndTo = document.getElementById('group-by-end-to');
+        const filterDateFrom = document.getElementById('group-by-date-from');
+        const filterDateTo = document.getElementById('group-by-date-to');
         const filterClearBtn = document.getElementById('group-by-filter-clear');
         let currentSortKey = null;
         let currentSortAsc = true;
 
         function getParams() {
             const p = { table: 'group_by', by: (select && select.value) || 'agency' };
-            if (filterStartFrom && filterStartFrom.value) p.start_from = filterStartFrom.value;
-            if (filterStartTo && filterStartTo.value) p.start_to = filterStartTo.value;
-            if (filterEndFrom && filterEndFrom.value) p.end_from = filterEndFrom.value;
-            if (filterEndTo && filterEndTo.value) p.end_to = filterEndTo.value;
+            if (filterDateFrom && filterDateFrom.value) p.date_from = filterDateFrom.value;
+            if (filterDateTo && filterDateTo.value) p.date_to = filterDateTo.value;
             if (currentSortKey) p.sort = currentSortKey;
             p.order = currentSortAsc ? 'asc' : 'desc';
             return p;
@@ -437,14 +416,12 @@ th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.8; }
             load();
         }
 
-        [filterStartFrom, filterStartTo, filterEndFrom, filterEndTo].forEach(el => {
+        [filterDateFrom, filterDateTo].forEach(el => {
             if (el) { el.addEventListener('input', load); el.addEventListener('change', load); }
         });
         if (filterClearBtn) filterClearBtn.addEventListener('click', () => {
-            if (filterStartFrom) filterStartFrom.value = '';
-            if (filterStartTo) filterStartTo.value = '';
-            if (filterEndFrom) filterEndFrom.value = '';
-            if (filterEndTo) filterEndTo.value = '';
+            if (filterDateFrom) filterDateFrom.value = '';
+            if (filterDateTo) filterDateTo.value = '';
             if (window.updateDatePlaceholders) window.updateDatePlaceholders();
             load();
         });

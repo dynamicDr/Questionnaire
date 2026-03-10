@@ -5,7 +5,7 @@ table { border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 
 th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
 th { background: var(--side-bg); }
 form.inline { display: inline-block; margin: 0; }
-input[type="text"], input[type="number"], input[type="date"] { width: 120px; box-sizing: border-box; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; }
+input[type="text"], input[type="number"], input[type="date"], input[type="month"] { width: 120px; box-sizing: border-box; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; }
 .create-form-row { margin-bottom: 8px; }
 .create-form-row label { display: inline-block; width: 130px; }
 .submit-btn { padding: 6px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; border: 1px solid var(--border); background: var(--side-bg); color: var(--text); }
@@ -27,6 +27,13 @@ input[type="text"], input[type="number"], input[type="date"] { width: 120px; box
 .confirm-modal-btns { display: flex; gap: 12px; justify-content: flex-end; }
 .confirm-modal-btns .confirm-delete-btn { background: #dc2626; color: #fff; border-color: #b91c1c; }
 .confirm-modal-btns .confirm-delete-btn:hover { background: #b91c1c; }
+.tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.tab-btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; color: var(--text-muted); }
+.tab-btn.active { background: rgba(16,163,127,.1); color: var(--accent); border-color: rgba(16,163,127,.25); }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+.modify-tab-pane { display: none; }
+.modify-tab-pane.active { display: block; }
 {% endblock %}
 {% block content %}
 <h1>问卷录入</h1>
@@ -38,14 +45,10 @@ input[type="text"], input[type="number"], input[type="date"] { width: 120px; box
         <p>团号「{{ existing_group.group_no }}」已存在。现有信息如下：</p>
         <div class="group-exists-info">
             <div>团号：{{ existing_group.group_no }}</div>
-            <div>地接社：{{ existing_group.agency }}</div>
-            <div>酒店：{{ existing_group.hotel }}</div>
-            <div>地区：{{ existing_group.region }}</div>
             <div>人数：{{ existing_group.people_count }}</div>
             <div>意见表回收数量：{{ existing_group.feedback_count }}</div>
             <div>回收率：{{ existing_group.feedback_rate }}</div>
-            <div>开始日期：{{ existing_group.start_date }}</div>
-            <div>截止日期：{{ existing_group.end_date }}</div>
+            <div>日期：{{ existing_group.date }}</div>
         </div>
         <p>是否用当前填写的信息覆盖以上内容？</p>
         <div class="group-exists-btns">
@@ -57,12 +60,12 @@ input[type="text"], input[type="number"], input[type="date"] { width: 120px; box
                 <input type="hidden" name="confirm_overwrite" value="1">
                 <input type="hidden" name="group_no" value="{{ create_form_data.group_no }}">
                 <input type="hidden" name="agency" value="{{ create_form_data.agency }}">
+                <input type="hidden" name="guide" value="{{ create_form_data.guide }}">
                 <input type="hidden" name="hotel" value="{{ create_form_data.hotel }}">
                 <input type="hidden" name="region" value="{{ create_form_data.region }}">
                 <input type="hidden" name="people_count" value="{{ create_form_data.people_count }}">
                 <input type="hidden" name="feedback_count" value="{{ create_form_data.feedback_count }}">
-                <input type="hidden" name="start_date" value="{{ create_form_data.start_date }}">
-                <input type="hidden" name="end_date" value="{{ create_form_data.end_date }}">
+                <input type="hidden" name="date" value="{{ create_form_data.date }}">
                 <button type="submit" class="submit-btn">覆盖</button>
             </form>
         </div>
@@ -82,19 +85,8 @@ input[type="text"], input[type="number"], input[type="date"] { width: 120px; box
 </div>
 {% endif %}
 
-<div id="delete-group-modal" class="confirm-overlay" style="display: none;">
-    <div class="confirm-modal">
-        <h4>确认删除团</h4>
-        <p id="delete-group-message"></p>
-        <div class="confirm-modal-btns">
-            <button type="button" class="submit-btn" id="delete-group-cancel">取消</button>
-            <button type="button" class="submit-btn confirm-delete-btn" id="delete-group-confirm">确认删除</button>
-        </div>
-    </div>
-</div>
-
 <div class="section">
-    <h3>新增团</h3>
+    <h3>团信息</h3>
     <form method="post">
         {% csrf_token %}
         <input type="hidden" name="entity" value="group">
@@ -102,233 +94,669 @@ input[type="text"], input[type="number"], input[type="date"] { width: 120px; box
 
         <div class="create-form-row">
             <label>团号：</label>
-            <input type="text" name="group_no" required value="{% if group_exists %}{{ create_form_data.group_no }}{% endif %}">
-        </div>
-        <div class="create-form-row">
-            <label>地接社：</label>
-            <input type="text" name="agency" value="{% if group_exists %}{{ create_form_data.agency }}{% endif %}">
-        </div>
-        <div class="create-form-row">
-            <label>酒店：</label>
-            <input type="text" name="hotel" value="{% if group_exists %}{{ create_form_data.hotel }}{% endif %}">
-        </div>
-        <div class="create-form-row">
-            <label>地区：</label>
-            <input type="text" name="region" value="{% if group_exists %}{{ create_form_data.region }}{% endif %}">
+            <input type="text" name="group_no" id="group-create-group-no" required value="{{ create_form_data.group_no|default:'' }}">
+            <button type="button" class="submit-btn" id="group-read-btn" style="margin-left:8px;">读取</button>
         </div>
         <div class="create-form-row">
             <label>人数：</label>
-            <input type="number" name="people_count" min="0" value="{% if group_exists %}{{ create_form_data.people_count }}{% endif %}">
+            <input type="number" name="people_count" id="group-create-people-count" min="0" value="{{ create_form_data.people_count|default:'' }}">
         </div>
         <div class="create-form-row">
             <label>意见表回收数量：</label>
-            <input type="number" name="feedback_count" min="0" value="{% if group_exists %}{{ create_form_data.feedback_count }}{% endif %}">
+            <input type="number" name="feedback_count" id="group-create-feedback-count" min="0" value="{{ create_form_data.feedback_count|default:'' }}">
         </div>
         <div class="create-form-row">
-            <label>开始日期：</label>
-            <input type="date" name="start_date" value="{% if group_exists %}{{ create_form_data.start_date }}{% endif %}">
+            <label>回收率：</label>
+            <span id="group-create-feedback-rate" style="display:inline-block; min-width:120px; padding:6px 8px; border:1px solid var(--border); border-radius:4px; background:#f7f7f8;">&nbsp;</span>
         </div>
         <div class="create-form-row">
-            <label>截止日期：</label>
-            <input type="date" name="end_date" value="{% if group_exists %}{{ create_form_data.end_date }}{% endif %}">
+            <label>日期：</label>
+            <input type="month" name="date" id="group-create-date" value="{{ create_form_data.date|default:'' }}">
         </div>
-
-        <button type="submit" class="submit-btn">新增</button>
+        <button type="submit" class="submit-btn">新增/更新团信息</button>
     </form>
 
-    <h3>团列表</h3>
-    <table id="group-table">
-        <thead>
-        <tr>
-            <th>序号</th>
-            <th>团号</th>
-            <th>地接社</th>
-            <th>酒店</th>
-            <th>地区</th>
-            <th>人数</th>
-            <th>意见表回收数量</th>
-            <th>回收率</th>
-            <th>开始日期</th>
-            <th>截止日期</th>
-            <th>操作</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for idx, g, traveler_count in groups %}
-            <tr>
-                <td>{{ forloop.counter }}</td>
-                <td>
-                    <form method="post" class="inline">
-                        {% csrf_token %}
-                        <input type="hidden" name="entity" value="group">
-                        <input type="hidden" name="action" value="update">
-                        <input type="hidden" name="index" value="{{ idx }}">
-                        <input type="text" name="group_no" value="{{ g.group_no }}">
-                </td>
-                <td>
-                        <input type="text" name="agency" value="{{ g.agency }}">
-                </td>
-                <td>
-                        <input type="text" name="hotel" value="{{ g.hotel }}">
-                </td>
-                <td>
-                        <input type="text" name="region" value="{{ g.region }}">
-                </td>
-                <td>
-                        <input type="number" name="people_count" value="{{ g.people_count }}">
-                </td>
-                <td>
-                        <input type="number" name="feedback_count" value="{{ g.feedback_count }}">
-                </td>
-                <td>
-                        {{ g.feedback_rate }}
-                </td>
-                <td>
-                        <input type="date" name="start_date" value="{{ g.start_date }}">
-                </td>
-                <td>
-                        <input type="date" name="end_date" value="{{ g.end_date }}">
-                </td>
-                <td>
-                        <button type="submit" class="submit-btn">保存</button>
-                    </form>
+    <h3>问卷信息</h3>
+    <div class="create-form-row">
+        <label>地接社：</label>
+        <input type="text" name="agency" id="group-create-agency" class="fuzzy-input" data-fuzzy-type="agency" autocomplete="off" value="{{ create_form_data.agency|default:'' }}">
+    </div>
+    <div class="create-form-row">
+        <label>导游：</label>
+        <input type="text" name="guide" id="group-create-guide" class="fuzzy-input" data-fuzzy-type="guide" autocomplete="off" value="{{ create_form_data.guide|default:'' }}">
+    </div>
+    {% comment %}酒店暂时隐藏
+    <div class="create-form-row">
+        <label>酒店：</label>
+        <input type="text" name="hotel" id="group-create-hotel" value="{{ create_form_data.hotel|default:'' }}">
+    </div>
+    {% endcomment %}
+    <div class="create-form-row">
+        <label>地区：</label>
+        <input type="text" name="region" id="group-create-region" class="fuzzy-input" data-fuzzy-type="region" autocomplete="off" value="{{ create_form_data.region|default:'' }}">
+    </div>
 
-                    <form method="post" class="inline group-delete-form">
-                        {% csrf_token %}
-                        <input type="hidden" name="entity" value="group">
-                        <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="index" value="{{ idx }}">
-                        <button type="button" class="submit-btn group-delete-btn"
-                                data-traveler-count="{{ traveler_count }}">删除</button>
-                    </form>
-                </td>
-            </tr>
-        {% empty %}
+    <div class="tabs">
+        <button type="button" class="tab-btn active" data-tab="tab-local">地陪</button>
+        <button type="button" class="tab-btn" data-tab="tab-full">全陪</button>
+    </div>
+
+    <div id="tab-local" class="tab-pane active">
+        <form method="post" id="local-questionnaire-form">
+            {% csrf_token %}
+            <input type="hidden" name="entity" value="traveler">
+            <input type="hidden" name="action" value="create">
+            <input type="hidden" name="g_group_no">
+            <input type="hidden" name="g_agency">
+            <input type="hidden" name="g_guide">
+            <input type="hidden" name="g_hotel">
+            <input type="hidden" name="g_region">
+            <input type="hidden" name="g_people_count">
+            <input type="hidden" name="g_feedback_count">
+            <input type="hidden" name="g_date">
+            <input type="hidden" name="recent_travelers" value="{{ recent_travelers_param|default:'' }}">
+            <input type="hidden" name="recent_full_escorts" value="{{ recent_full_escorts_param|default:'' }}">
+
+            <div class="create-form-row">
+                <label>地陪语言和讲解：</label>
+                <input type="text" name="guide_language" maxlength="1" class="score-input auto-next-local" pattern="[1-5]">
+            </div>
+            <div class="create-form-row">
+                <label>地陪服务态度：</label>
+                <input type="text" name="guide_service" maxlength="1" class="score-input auto-next-local" pattern="[1-5]">
+            </div>
+            <div class="create-form-row">
+                <label>车辆舒适度：</label>
+                <input type="text" name="vehicle_comfort" maxlength="1" class="score-input auto-next-local" pattern="[1-5]">
+            </div>
+            <div class="create-form-row">
+                <label>车辆干净程度：</label>
+                <input type="text" name="vehicle_clean" maxlength="1" class="score-input auto-next-local" pattern="[1-5]">
+            </div>
+            <div class="create-form-row">
+                <label>司机服务：</label>
+                <input type="text" name="driver_service" maxlength="1" class="score-input auto-next-local" pattern="[1-5]">
+            </div>
+            <div class="create-form-row">
+                <label>餐饮质量：</label>
+                <input type="text" name="food_quality" maxlength="1" class="score-input auto-next-local" pattern="[1-5]">
+            </div>
+            <div class="create-form-row">
+                <label>餐厅环境：</label>
+                <input type="text" name="restaurant_environment" maxlength="1" class="score-input auto-next-local" pattern="[1-5]">
+            </div>
+
+            <button type="submit" class="submit-btn">新增问卷</button>
+        </form>
+    </div>
+
+    <div id="tab-full" class="tab-pane">
+        <form method="post" id="full-questionnaire-form">
+            {% csrf_token %}
+            <input type="hidden" name="entity" value="full_escort">
+            <input type="hidden" name="action" value="create">
+            <input type="hidden" name="g_group_no">
+            <input type="hidden" name="g_agency">
+            <input type="hidden" name="g_guide">
+            <input type="hidden" name="g_hotel">
+            <input type="hidden" name="g_region">
+            <input type="hidden" name="g_people_count">
+            <input type="hidden" name="g_feedback_count">
+            <input type="hidden" name="g_date">
+            <input type="hidden" name="recent_travelers" value="{{ recent_travelers_param|default:'' }}">
+            <input type="hidden" name="recent_full_escorts" value="{{ recent_full_escorts_param|default:'' }}">
+
+            <div class="create-form-row">
+                <label>节奏：</label>
+                <input type="text" name="pace" maxlength="1" class="score-input auto-next-full" pattern="[1-5]">
+            </div>
+            <div class="create-form-row">
+                <label>讲解：</label>
+                <input type="text" name="explanation" maxlength="1" class="score-input auto-next-full" pattern="[1-5]">
+            </div>
+            <div class="create-form-row">
+                <label>服务：</label>
+                <input type="text" name="service" maxlength="1" class="score-input auto-next-full" pattern="[1-5]">
+            </div>
+            <div class="create-form-row">
+                <label>设计：</label>
+                <input type="text" name="design" maxlength="1" class="score-input auto-next-full" pattern="[1-5]">
+            </div>
+            <div class="create-form-row">
+                <label>期望：</label>
+                <input type="text" name="expectation" maxlength="1" class="score-input auto-next-full" pattern="[1-5]">
+            </div>
+            <div class="create-form-row">
+                <label>推荐：</label>
+                <input type="text" name="recommendation" maxlength="1" class="score-input auto-next-full" pattern="[1-5]">
+            </div>
+            <div class="create-form-row">
+                <label>总评：</label>
+                <input type="text" name="overall" maxlength="1" class="score-input auto-next-full" pattern="[1-5]">
+            </div>
+
+            <button type="submit" class="submit-btn">新增问卷</button>
+        </form>
+    </div>
+
+    <h3 style="margin-top: 20px;">本次添加的问卷</h3>
+    <div id="modify-local" class="modify-tab-pane active">
+        <table id="traveler-modify-table">
+            <thead>
             <tr>
-                <td colspan="10">暂无团数据。</td>
+                <th>所属团号</th>
+                <th>地区</th>
+                <th>地接社</th>
+                <th>导游</th>
+                <th>地陪语言和讲解</th>
+                <th>地陪服务态度</th>
+                <th>车辆舒适度</th>
+                <th>车辆干净程度</th>
+                <th>司机服务</th>
+                <th>餐饮质量</th>
+                <th>餐厅环境</th>
+                <th>操作</th>
             </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    <div id="group-pager" class="pager"></div>
+            </thead>
+            <tbody>
+            {% for idx, t in recent_travelers %}
+                <tr>
+                    <td>
+                        <form method="post" class="inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="entity" value="traveler">
+                            <input type="hidden" name="action" value="update">
+                            <input type="hidden" name="index" value="{{ idx }}">
+                            <input type="text" name="group_no" value="{{ t.group_no }}">
+                    </td>
+                    <td><input type="text" name="region" class="fuzzy-input" data-fuzzy-type="region" autocomplete="off" value="{{ t.region }}"></td>
+                    <td><input type="text" name="agency" class="fuzzy-input" data-fuzzy-type="agency" autocomplete="off" value="{{ t.agency }}"></td>
+                    <td><input type="text" name="guide" class="fuzzy-input" data-fuzzy-type="guide" autocomplete="off" value="{{ t.guide }}"></td>
+                    <td><input type="text" name="guide_language" value="{{ t.guide_language }}"></td>
+                    <td><input type="text" name="guide_service" value="{{ t.guide_service }}"></td>
+                    <td><input type="text" name="vehicle_comfort" value="{{ t.vehicle_comfort }}"></td>
+                    <td><input type="text" name="vehicle_clean" value="{{ t.vehicle_clean }}"></td>
+                    <td><input type="text" name="driver_service" value="{{ t.driver_service }}"></td>
+                    <td><input type="text" name="food_quality" value="{{ t.food_quality }}"></td>
+                    <td><input type="text" name="restaurant_environment" value="{{ t.restaurant_environment }}"></td>
+                    <td>
+                            <button type="submit" class="submit-btn">保存</button>
+                        </form>
+                        <form method="post" class="inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="entity" value="traveler">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="index" value="{{ idx }}">
+                            <button type="submit" class="submit-btn">删除</button>
+                        </form>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="12">本次暂无地陪问卷数据。</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <div id="traveler-modify-pager" class="pager"></div>
+    </div>
+
+    <div id="modify-full" class="modify-tab-pane">
+        <table id="full-escort-modify-table">
+            <thead>
+            <tr>
+                <th>所属团号</th>
+                <th>地区</th>
+                <th>地接社</th>
+                <th>导游</th>
+                <th>节奏</th>
+                <th>讲解</th>
+                <th>服务</th>
+                <th>设计</th>
+                <th>期望</th>
+                <th>推荐</th>
+                <th>总评</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for idx, f in recent_full_escorts %}
+                <tr>
+                    <td>
+                        <form method="post" class="inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="entity" value="full_escort">
+                            <input type="hidden" name="action" value="update">
+                            <input type="hidden" name="index" value="{{ idx }}">
+                            <input type="text" name="group_no" value="{{ f.group_no }}">
+                    </td>
+                    <td><input type="text" name="region" class="fuzzy-input" data-fuzzy-type="region" autocomplete="off" value="{{ f.region }}"></td>
+                    <td><input type="text" name="agency" class="fuzzy-input" data-fuzzy-type="agency" autocomplete="off" value="{{ f.agency }}"></td>
+                    <td><input type="text" name="guide" class="fuzzy-input" data-fuzzy-type="guide" autocomplete="off" value="{{ f.guide }}"></td>
+                    <td><input type="text" name="pace" value="{{ f.pace }}"></td>
+                    <td><input type="text" name="explanation" value="{{ f.explanation }}"></td>
+                    <td><input type="text" name="service" value="{{ f.service }}"></td>
+                    <td><input type="text" name="design" value="{{ f.design }}"></td>
+                    <td><input type="text" name="expectation" value="{{ f.expectation }}"></td>
+                    <td><input type="text" name="recommendation" value="{{ f.recommendation }}"></td>
+                    <td><input type="text" name="overall" value="{{ f.overall }}"></td>
+                    <td>
+                            <button type="submit" class="submit-btn">保存</button>
+                        </form>
+                        <form method="post" class="inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="entity" value="full_escort">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="index" value="{{ idx }}">
+                            <button type="submit" class="submit-btn">删除</button>
+                        </form>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="12">本次暂无全陪问卷数据。</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <div id="full-escort-modify-pager" class="pager"></div>
+    </div>
+
 </div>
-
-<div class="section">
-    <h3>新增旅客问卷</h3>
-    <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="entity" value="traveler">
-        <input type="hidden" name="action" value="create">
-
-        <div class="create-form-row">
-            <label>所属团号：</label>
-            <input type="text" name="group_no" required value="{{ last_group_no }}">
-        </div>
-        <div class="create-form-row">
-            <label>地陪语言和讲解：</label>
-            <input type="text" name="guide_language" maxlength="1" class="score-input auto-next" pattern="[1-5]">
-        </div>
-        <div class="create-form-row">
-            <label>地陪服务态度：</label>
-            <input type="text" name="guide_service" maxlength="1" class="score-input auto-next" pattern="[1-5]">
-        </div>
-        <div class="create-form-row">
-            <label>车辆舒适度：</label>
-            <input type="text" name="vehicle_comfort" maxlength="1" class="score-input auto-next" pattern="[1-5]">
-        </div>
-        <div class="create-form-row">
-            <label>车辆干净程度：</label>
-            <input type="text" name="vehicle_clean" maxlength="1" class="score-input auto-next" pattern="[1-5]">
-        </div>
-        <div class="create-form-row">
-            <label>司机服务：</label>
-            <input type="text" name="driver_service" maxlength="1" class="score-input auto-next" pattern="[1-5]">
-        </div>
-        <div class="create-form-row">
-            <label>餐饮质量：</label>
-            <input type="text" name="food_quality" maxlength="1" class="score-input auto-next" pattern="[1-5]">
-        </div>
-        <div class="create-form-row">
-            <label>餐厅环境：</label>
-            <input type="text" name="restaurant_environment" maxlength="1" class="score-input auto-next" pattern="[1-5]">
-        </div>
-
-        <button type="submit" class="submit-btn">新增</button>
-    </form>
-
-    <h3>旅客问卷列表</h3>
-    <table id="traveler-table-add">
-        <thead>
-        <tr>
-            <th>序号</th>
-            <th>所属团号</th>
-            <th>地陪语言和讲解</th>
-            <th>地陪服务态度</th>
-            <th>车辆舒适度</th>
-            <th>车辆干净程度</th>
-            <th>司机服务</th>
-            <th>餐饮质量</th>
-            <th>餐厅环境</th>
-            <th>操作</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for idx, t in travelers %}
-            <tr>
-                <td>{{ forloop.counter }}</td>
-                <td>
-                    <form method="post" class="inline">
-                        {% csrf_token %}
-                        <input type="hidden" name="entity" value="traveler">
-                        <input type="hidden" name="action" value="update">
-                        <input type="hidden" name="index" value="{{ idx }}">
-                        <input type="text" name="group_no" value="{{ t.group_no }}">
-                </td>
-                <td>
-                        <input type="text" name="guide_language" value="{{ t.guide_language }}">
-                </td>
-                <td>
-                        <input type="text" name="guide_service" value="{{ t.guide_service }}">
-                </td>
-                <td>
-                        <input type="text" name="vehicle_comfort" value="{{ t.vehicle_comfort }}">
-                </td>
-                <td>
-                        <input type="text" name="vehicle_clean" value="{{ t.vehicle_clean }}">
-                </td>
-                <td>
-                        <input type="text" name="driver_service" value="{{ t.driver_service }}">
-                </td>
-                <td>
-                        <input type="text" name="food_quality" value="{{ t.food_quality }}">
-                </td>
-                <td>
-                        <input type="text" name="restaurant_environment" value="{{ t.restaurant_environment }}">
-                </td>
-                <td>
-                        <button type="submit" class="submit-btn">保存</button>
-                    </form>
-
-                    <form method="post" class="inline">
-                        {% csrf_token %}
-                        <input type="hidden" name="entity" value="traveler">
-                        <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="index" value="{{ idx }}">
-                        <button type="submit" class="submit-btn">删除</button>
-                    </form>
-                </td>
-            </tr>
-        {% empty %}
-            <tr>
-                <td colspan="10">暂无旅客问卷数据。</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    <div id="traveler-add-pager" class="pager"></div>
-</div>
+{{ supplier_agencies|json_script:"supplier-agency-data" }}
+{{ supplier_guides|json_script:"supplier-guide-data" }}
 
 <script>
+    const GROUP_INFO_API_URL = '{% url "group_info_api" %}';
+
+    // ==================== 统一模糊匹配系统 ====================
+    const FuzzyMatcher = (function () {
+        // 拼音映射表（简化版，覆盖常用汉字）
+        const pinyinMap = {
+            '北': ['bei', 'b'], '京': ['jing', 'j'], '上': ['shang', 'sh', 's'], '海': ['hai', 'h'],
+            '天': ['tian', 't'], '津': ['jin', 'j'], '重': ['chong', 'zh', 'c'], '庆': ['qing', 'q'],
+            '河': ['he', 'h'], '南': ['nan', 'n'], '湖': ['hu', 'h'], '广': ['guang', 'g'],
+            '东': ['dong', 'd'], '西': ['xi', 'x'], '山': ['shan', 'sh', 's'], '江': ['jiang', 'j'],
+            '浙': ['zhe', 'z'], '安': ['an', 'a'], '徽': ['hui', 'h'], '福': ['fu', 'f'],
+            '建': ['jian', 'j'], '四': ['si', 's'], '川': ['chuan', 'ch', 'c'], '云': ['yun', 'y'],
+            '贵': ['gui', 'g'], '州': ['zhou', 'z'], '陕': ['shan', 'sh', 's'], '甘': ['gan', 'g'],
+            '肃': ['su', 's'], '青': ['qing', 'q'], '台': ['tai', 't'], '湾': ['wan', 'w'],
+            '内': ['nei', 'n'], '蒙': ['meng', 'm'], '古': ['gu', 'g'], '藏': ['zang', 'z'],
+            '宁': ['ning', 'n'], '夏': ['xia', 'x'], '新': ['xin', 'x'], '疆': ['jiang', 'j'],
+            '香': ['xiang', 'x'], '港': ['gang', 'g'], '澳': ['ao', 'a'], '门': ['men', 'm'],
+            '辽': ['liao', 'l'], '吉': ['ji', 'j'], '林': ['lin', 'l'], '黑': ['hei', 'h'],
+            '龙': ['long', 'l'], '苏': ['su', 's'],
+            // 常用人名/公司名汉字
+            '张': ['zhang', 'zh', 'z'], '王': ['wang', 'w'], '李': ['li', 'l'], '赵': ['zhao', 'zh', 'z'],
+            '刘': ['liu', 'l'], '陈': ['chen', 'ch', 'c'], '杨': ['yang', 'y'], '黄': ['huang', 'h'],
+            '周': ['zhou', 'z'], '吴': ['wu', 'w'], '郑': ['zheng', 'zh', 'z'], '孙': ['sun', 's'],
+            '马': ['ma', 'm'], '朱': ['zhu', 'z'], '胡': ['hu', 'h'], '郭': ['guo', 'g'],
+            '林': ['lin', 'l'], '何': ['he', 'h'], '高': ['gao', 'g'], '罗': ['luo', 'l'],
+            '旅': ['lv', 'l'], '游': ['you', 'y'], '行': ['xing', 'hang', 'h', 'x'], '社': ['she', 's'],
+            '国': ['guo', 'g'], '际': ['ji', 'j'], '中': ['zhong', 'z'], '华': ['hua', 'h'],
+            '大': ['da', 'd'], '小': ['xiao', 'x'], '公': ['gong', 'g'], '司': ['si', 's'],
+        };
+
+        // 获取汉字的拼音（全拼和首字母）
+        function getPinyin(char) {
+            return pinyinMap[char] || [];
+        }
+
+        // 获取字符串的所有可能拼音组合（首字母缩写 + 全拼）
+        function getSearchableStrings(text) {
+            if (!text) return [];
+            const result = [text.toLowerCase()];
+            let initials = '';
+            let fullPinyin = '';
+
+            for (const char of text) {
+                const pinyins = getPinyin(char);
+                if (pinyins.length > 0) {
+                    initials += pinyins[pinyins.length - 1]; // 首字母（最后一个通常是首字母）
+                    fullPinyin += pinyins[0]; // 全拼
+                } else if (/[a-zA-Z]/.test(char)) {
+                    initials += char.toLowerCase();
+                    fullPinyin += char.toLowerCase();
+                }
+            }
+
+            if (initials) result.push(initials);
+            if (fullPinyin && fullPinyin !== initials) result.push(fullPinyin);
+
+            return result;
+        }
+
+        // 核心模糊匹配函数
+        function fuzzyMatch(keyword, item) {
+            if (!keyword) return true;
+            const kw = keyword.toLowerCase().trim();
+            if (!kw) return true;
+
+            const searchables = item.searchables || [];
+
+            // 1. 精确包含匹配
+            for (const s of searchables) {
+                if (s.includes(kw)) return true;
+            }
+
+            // 2. 首字母连续匹配（如 bj 匹配 beijing）
+            for (const s of searchables) {
+                if (s.startsWith(kw)) return true;
+            }
+
+            // 3. 关键字拆分匹配（输入的每个字符都能在某个searchable中按顺序找到）
+            for (const s of searchables) {
+                let idx = 0;
+                for (const char of kw) {
+                    const pos = s.indexOf(char, idx);
+                    if (pos === -1) break;
+                    idx = pos + 1;
+                    if (idx >= kw.length || [...kw].every((c, i) => {
+                        const p = s.indexOf(c, i === 0 ? 0 : s.indexOf(kw[i-1]) + 1);
+                        return p !== -1;
+                    })) {
+                        // 简化：检查是否所有字符都按顺序出现
+                        let matchIdx = 0;
+                        let allMatch = true;
+                        for (const c of kw) {
+                            const foundAt = s.indexOf(c, matchIdx);
+                            if (foundAt === -1) {
+                                allMatch = false;
+                                break;
+                            }
+                            matchIdx = foundAt + 1;
+                        }
+                        if (allMatch) return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        // 创建数据项（预计算searchables）
+        function createItem(value, aliases = []) {
+            const searchables = getSearchableStrings(value);
+            aliases.forEach(alias => {
+                const aliasLower = alias.toLowerCase();
+                if (!searchables.includes(aliasLower)) {
+                    searchables.push(aliasLower);
+                }
+            });
+            return { value, searchables };
+        }
+
+        return { fuzzyMatch, createItem, getSearchableStrings };
+    })();
+
+    // ==================== 数据源定义 ====================
+    const DataSources = (function () {
+        // 地区数据（带别名）
+        const regionDefs = [
+            { name: '北京', aliases: ['bj', 'beijing', 'peking'] },
+            { name: '天津', aliases: ['tj', 'tianjin'] },
+            { name: '上海', aliases: ['sh', 'shanghai'] },
+            { name: '重庆', aliases: ['cq', 'chongqing'] },
+            { name: '河北', aliases: ['heb', 'hebei'] },
+            { name: '山西', aliases: ['sx', 'shanxi'] },
+            { name: '辽宁', aliases: ['ln', 'liaoning'] },
+            { name: '吉林', aliases: ['jl', 'jilin'] },
+            { name: '黑龙江', aliases: ['hlj', 'heilongjiang'] },
+            { name: '江苏', aliases: ['js', 'jiangsu'] },
+            { name: '浙江', aliases: ['zj', 'zhejiang'] },
+            { name: '安徽', aliases: ['ah', 'anhui'] },
+            { name: '福建', aliases: ['fj', 'fujian'] },
+            { name: '江西', aliases: ['jx', 'jiangxi'] },
+            { name: '山东', aliases: ['sd', 'shandong'] },
+            { name: '河南', aliases: ['hen', 'henan'] },
+            { name: '湖北', aliases: ['hub', 'hubei'] },
+            { name: '湖南', aliases: ['hun', 'hunan'] },
+            { name: '广东', aliases: ['gd', 'guangdong'] },
+            { name: '海南', aliases: ['hain', 'hainan'] },
+            { name: '四川', aliases: ['sc', 'sichuan'] },
+            { name: '贵州', aliases: ['gz', 'guizhou'] },
+            { name: '云南', aliases: ['yn', 'yunnan'] },
+            { name: '陕西', aliases: ['snx', 'shaanxi', 'shenxi'] },
+            { name: '甘肃', aliases: ['gs', 'gansu'] },
+            { name: '青海', aliases: ['qh', 'qinghai'] },
+            { name: '台湾', aliases: ['tw', 'taiwan'] },
+            { name: '内蒙古', aliases: ['nmg', 'neimenggu', 'innermongolia'] },
+            { name: '广西', aliases: ['gx', 'guangxi'] },
+            { name: '西藏', aliases: ['xz', 'xizang', 'tibet'] },
+            { name: '宁夏', aliases: ['nx', 'ningxia'] },
+            { name: '新疆', aliases: ['xj', 'xinjiang'] },
+            { name: '香港', aliases: ['hk', 'xg', 'xianggang', 'hongkong'] },
+            { name: '澳门', aliases: ['mo', 'am', 'aomen', 'macau', 'macao'] },
+        ];
+
+        const regions = regionDefs.map(r => FuzzyMatcher.createItem(r.name, r.aliases));
+
+        // 地接社数据（从服务器获取）
+        let agencies = [];
+        const agencyDataEl = document.getElementById('supplier-agency-data');
+        if (agencyDataEl) {
+            try {
+                const rawAgencies = JSON.parse(agencyDataEl.textContent || '[]');
+                agencies = rawAgencies
+                    .filter(a => a && (a.name || '').trim())
+                    .map(a => {
+                        const name = String(a.name).trim();
+                        const initials = (a.name_initials || '').trim();
+                        const aliases = initials ? [initials.toLowerCase()] : [];
+                        return FuzzyMatcher.createItem(name, aliases);
+                    });
+            } catch (e) { console.error('解析地接社数据失败', e); }
+        }
+
+        // 导游数据（从服务器获取，支持中英文名 + 首字母）
+        let guides = [];
+        const guideDataEl = document.getElementById('supplier-guide-data');
+        if (guideDataEl) {
+            try {
+                const rawGuides = JSON.parse(guideDataEl.textContent || '[]');
+                guides = rawGuides
+                    .filter(g => g && (g.name_cn || g.name_en))
+                    .map(g => {
+                        const nameCn = (g.name_cn || '').trim();
+                        const nameEn = (g.name_en || '').trim();
+                        const initials = (g.name_initials || '').trim();
+                        const aliases = [];
+                        if (nameEn) aliases.push(nameEn.toLowerCase());
+                        if (initials) aliases.push(initials.toLowerCase());
+                        return FuzzyMatcher.createItem(nameCn || nameEn, aliases);
+                    })
+                    .filter(item => item.value);
+            } catch (e) { console.error('解析导游数据失败', e); }
+        }
+
+        return {
+            region: regions,
+            agency: agencies,
+            guide: guides,
+        };
+    })();
+
+    // ==================== 下拉组件 ====================
+    const FuzzyDropdown = (function () {
+        const dropdownStyle = `
+            .fuzzy-dropdown {
+                position: absolute;
+                background: #fff;
+                border: 1px solid var(--border, #ddd);
+                border-radius: 4px;
+                max-height: 200px;
+                overflow-y: auto;
+                z-index: 1000;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                display: none;
+            }
+            .fuzzy-dropdown.show { display: block; }
+            .fuzzy-dropdown-item {
+                padding: 8px 12px;
+                cursor: pointer;
+                font-size: 13px;
+            }
+            .fuzzy-dropdown-item:hover,
+            .fuzzy-dropdown-item.active {
+                background: #f0f0f0;
+            }
+            .fuzzy-dropdown-empty {
+                padding: 8px 12px;
+                color: #999;
+                font-size: 13px;
+            }
+        `;
+
+        // 注入样式
+        if (!document.getElementById('fuzzy-dropdown-style')) {
+            const styleEl = document.createElement('style');
+            styleEl.id = 'fuzzy-dropdown-style';
+            styleEl.textContent = dropdownStyle;
+            document.head.appendChild(styleEl);
+        }
+
+        function create(input, dataSource) {
+            const dropdown = document.createElement('div');
+            dropdown.className = 'fuzzy-dropdown';
+            document.body.appendChild(dropdown);
+
+            let activeIndex = -1;
+            let filteredItems = [];
+            let isSelecting = false;
+
+            function position() {
+                const rect = input.getBoundingClientRect();
+                dropdown.style.left = rect.left + window.scrollX + 'px';
+                dropdown.style.top = rect.bottom + window.scrollY + 'px';
+                dropdown.style.width = Math.max(rect.width, 150) + 'px';
+            }
+
+            function render(items) {
+                filteredItems = items;
+                activeIndex = -1;
+
+                if (items.length === 0) {
+                    dropdown.innerHTML = '<div class="fuzzy-dropdown-empty">无匹配结果</div>';
+                } else {
+                    dropdown.innerHTML = items.map((item, idx) =>
+                        `<div class="fuzzy-dropdown-item" data-index="${idx}">${item.value}</div>`
+                    ).join('');
+                }
+
+                position();
+                dropdown.classList.add('show');
+            }
+
+            function hide() {
+                dropdown.classList.remove('show');
+                activeIndex = -1;
+            }
+
+            function select(index) {
+                if (index >= 0 && index < filteredItems.length) {
+                    isSelecting = true;
+                    input.value = filteredItems[index].value;
+                    hide();
+                    // 触发 change 事件
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                    setTimeout(() => { isSelecting = false; }, 100);
+                }
+            }
+
+            function updateActive() {
+                const items = dropdown.querySelectorAll('.fuzzy-dropdown-item');
+                items.forEach((item, idx) => {
+                    item.classList.toggle('active', idx === activeIndex);
+                });
+                // 滚动到可见
+                if (activeIndex >= 0 && items[activeIndex]) {
+                    items[activeIndex].scrollIntoView({ block: 'nearest' });
+                }
+            }
+
+            function filter(keyword) {
+                const matched = dataSource.filter(item => FuzzyMatcher.fuzzyMatch(keyword, item));
+                render(matched.length > 0 ? matched : dataSource.slice(0, 20));
+            }
+
+            // 事件绑定
+            input.addEventListener('focus', () => {
+                if (!isSelecting) filter(input.value);
+            });
+
+            input.addEventListener('input', () => {
+                filter(input.value);
+            });
+
+            input.addEventListener('blur', () => {
+                // 延迟隐藏，允许点击选择
+                setTimeout(() => {
+                    if (!isSelecting) hide();
+                }, 150);
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (!dropdown.classList.contains('show')) return;
+
+                switch (e.key) {
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        activeIndex = Math.min(activeIndex + 1, filteredItems.length - 1);
+                        updateActive();
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        activeIndex = Math.max(activeIndex - 1, 0);
+                        updateActive();
+                        break;
+                    case 'Enter':
+                        e.preventDefault();
+                        if (activeIndex >= 0) {
+                            select(activeIndex);
+                        } else if (filteredItems.length > 0) {
+                            select(0);
+                        }
+                        break;
+                    case 'Escape':
+                        hide();
+                        break;
+                    case 'Tab':
+                        hide();
+                        break;
+                }
+            });
+
+            dropdown.addEventListener('mousedown', (e) => {
+                const item = e.target.closest('.fuzzy-dropdown-item');
+                if (item) {
+                    e.preventDefault();
+                    select(parseInt(item.dataset.index, 10));
+                }
+            });
+
+            // 窗口滚动/调整大小时重新定位
+            window.addEventListener('scroll', () => {
+                if (dropdown.classList.contains('show')) position();
+            }, true);
+            window.addEventListener('resize', () => {
+                if (dropdown.classList.contains('show')) position();
+            });
+
+            return { hide, filter };
+        }
+
+        return { create };
+    })();
+
+    // ==================== 初始化所有模糊输入框 ====================
+    (function () {
+        document.querySelectorAll('.fuzzy-input').forEach(input => {
+            const type = input.dataset.fuzzyType;
+            const dataSource = DataSources[type];
+            if (dataSource && dataSource.length > 0) {
+                FuzzyDropdown.create(input, dataSource);
+            }
+        });
+    })();
+
+    // ==================== 其他原有功能 ====================
+
     // 所属团号不存在：点击确定关闭弹层
     (function () {
         const overlay = document.getElementById('group-not-found-overlay');
@@ -351,134 +779,204 @@ input[type="text"], input[type="number"], input[type="date"] { width: 120px; box
         }
     })();
 
-    // 新增旅客问卷时，评分项（1~5）输入一个数字后自动跳到下一个格子
+    // 地陪/全陪标签页
     (function () {
-        const inputs = Array.from(document.querySelectorAll('.auto-next'));
-        if (!inputs.length) return;
-
-        inputs.forEach((input, index) => {
-            input.addEventListener('input', function () {
-                const v = this.value.trim();
-                // 只接受 1-5 的一个数字
-                if (!/^[1-5]$/.test(v)) {
-                    this.value = '';
-                    return;
-                }
-                // 自动跳到下一个评分格子
-                const next = inputs[index + 1];
-                if (next) {
-                    next.focus();
-                    next.select();
-                }
-            });
-        });
-
-        // 如果是刚刚点击“新增旅客问卷”返回的页面，则自动把光标放到第一个评分格子
-        const shouldFocusTraveler = {{ focus_traveler|yesno:"true,false" }};
-        if (shouldFocusTraveler && inputs.length) {
-            inputs[0].focus();
-            inputs[0].select();
-        }
-    })();
-
-    // 删除团前，弹窗提示将一并删除多少条旅客信息
-    (function () {
-        const modal = document.getElementById('delete-group-modal');
-        const messageEl = document.getElementById('delete-group-message');
-        const cancelBtn = document.getElementById('delete-group-cancel');
-        const confirmBtn = document.getElementById('delete-group-confirm');
-        let pendingForm = null;
-
-        document.querySelectorAll('.group-delete-btn').forEach(function (btn) {
-            btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                const count = parseInt(this.getAttribute('data-traveler-count') || '0', 10);
-                let msg;
-                if (count > 0) {
-                    msg = `该团当前共有 ${count} 条旅客问卷记录。删除该团将同时删除这 ${count} 条旅客信息。是否确认删除？`;
-                } else {
-                    msg = '该团下目前没有旅客问卷记录。确认删除该团吗？';
-                }
-                messageEl.textContent = msg;
-                pendingForm = this.closest('form');
-                modal.style.display = 'flex';
-            });
-        });
-
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', function () {
-                modal.style.display = 'none';
-                pendingForm = null;
-            });
-        }
-        if (confirmBtn) {
-            confirmBtn.addEventListener('click', function () {
-                if (pendingForm) {
-                    pendingForm.submit();
-                }
-                modal.style.display = 'none';
-                pendingForm = null;
-            });
-        }
-    })();
-
-    // 简单翻页：团列表和旅客列表，每页 20 条
-    (function () {
-        function setupPager(tableId, pagerId) {
-            const table = document.getElementById(tableId);
-            const pager = document.getElementById(pagerId);
-            if (!table || !pager) return;
-
-            const tbody = table.querySelector('tbody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            const PAGE_SIZE = 20;
-            let currentPage = 1;
-
-            function renderPage() {
-                const total = rows.length;
-                const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-                if (currentPage > totalPages) currentPage = totalPages;
-                const start = (currentPage - 1) * PAGE_SIZE;
-                const end = start + PAGE_SIZE;
-                const pageRows = rows.slice(start, end);
-
-                tbody.innerHTML = '';
-                pageRows.forEach(r => tbody.appendChild(r));
-
-                pager.innerHTML = '';
-                const info = document.createElement('span');
-                info.textContent = `第 ${currentPage} / ${totalPages} 页（共 ${total} 条）`;
-
-                const prev = document.createElement('button');
-                prev.textContent = '上一页';
-                prev.disabled = currentPage <= 1;
-                prev.addEventListener('click', () => {
-                    if (currentPage > 1) {
-                        currentPage -= 1;
-                        renderPage();
-                    }
-                });
-
-                const next = document.createElement('button');
-                next.textContent = '下一页';
-                next.disabled = currentPage >= totalPages;
-                next.addEventListener('click', () => {
-                    if (currentPage < totalPages) {
-                        currentPage += 1;
-                        renderPage();
-                    }
-                });
-
-                pager.appendChild(prev);
-                pager.appendChild(next);
-                pager.appendChild(info);
+        const tabButtons = Array.from(document.querySelectorAll('.tab-btn'));
+        const tabPanes = Array.from(document.querySelectorAll('.tab-pane'));
+        const modifyLocal = document.getElementById('modify-local');
+        const modifyFull = document.getElementById('modify-full');
+        function activate(tabId) {
+            tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
+            tabPanes.forEach(pane => pane.classList.toggle('active', pane.id === tabId));
+            if (modifyLocal && modifyFull) {
+                const isLocal = tabId === 'tab-local';
+                modifyLocal.classList.toggle('active', isLocal);
+                modifyFull.classList.toggle('active', !isLocal);
             }
+        }
+        tabButtons.forEach(btn => btn.addEventListener('click', function () { activate(this.dataset.tab); }));
+        const focusTraveler = '{{ focus_traveler|yesno:"true,false" }}' === 'true';
+        const focusFull = '{{ focus_full_escort|yesno:"true,false" }}' === 'true';
+        if (focusFull) activate('tab-full');
+        else if (focusTraveler) activate('tab-local');
+    })();
 
-            renderPage();
+    // 本次添加列表只展示一次：渲染后清理 URL 参数，刷新即清空
+    (function () {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('recent_once') !== '1') return;
+        url.searchParams.delete('recent_once');
+        url.searchParams.delete('recent_travelers');
+        url.searchParams.delete('recent_full_escorts');
+        const next = url.pathname + (url.search ? url.search : '') + (url.hash || '');
+        history.replaceState(null, '', next);
+    })();
+
+    // 本次添加的问卷：保存/删除使用 AJAX，不刷新整页
+    (function () {
+        function ensureEmptyRow(table, text) {
+            const tbody = table.querySelector('tbody');
+            const bodyRows = Array.from(tbody.querySelectorAll('tr'));
+            if (bodyRows.length > 0) return;
+            const tr = document.createElement('tr');
+            const colCount = table.querySelectorAll('thead th').length || 1;
+            tr.innerHTML = `<td colspan="${colCount}">${text}</td>`;
+            tbody.appendChild(tr);
         }
 
-        setupPager('group-table', 'group-pager');
-        setupPager('traveler-table-add', 'traveler-add-pager');
+        function bindAjaxForms(tableId, emptyText) {
+            const table = document.getElementById(tableId);
+            if (!table) return;
+            const forms = table.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    const actionInput = form.querySelector('input[name="action"]');
+                    const action = actionInput ? actionInput.value : '';
+                    const row = form.closest('tr');
+                    fetch(window.location.href, {
+                        method: 'POST',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        body: new FormData(form),
+                    })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (!data || !data.ok) {
+                                alert('保存失败，请检查输入后重试。');
+                                return;
+                            }
+                            if (action === 'delete' && row) {
+                                row.remove();
+                                ensureEmptyRow(table, emptyText);
+                            }
+                        })
+                        .catch(() => {
+                            alert('请求失败，请稍后重试。');
+                        });
+                });
+            });
+        }
+
+        bindAjaxForms('traveler-modify-table', '本次暂无地陪问卷数据。');
+        bindAjaxForms('full-escort-modify-table', '本次暂无全陪问卷数据。');
+    })();
+
+    // 评分输入自动跳格（仅 1~5）
+    (function () {
+        function setupAutoNext(selector, shouldFocus) {
+            const inputs = Array.from(document.querySelectorAll(selector));
+            if (!inputs.length) return;
+            inputs.forEach((input, index) => {
+                input.addEventListener('input', function () {
+                    const v = this.value.trim();
+                    if (!/^[1-5]$/.test(v)) {
+                        this.value = '';
+                        return;
+                    }
+                    const next = inputs[index + 1];
+                    if (next) {
+                        next.focus();
+                        next.select();
+                    }
+                });
+            });
+            if (shouldFocus) {
+                inputs[0].focus();
+                inputs[0].select();
+            }
+        }
+        setupAutoNext('.auto-next-local', '{{ focus_traveler|yesno:"true,false" }}' === 'true');
+        setupAutoNext('.auto-next-full', '{{ focus_full_escort|yesno:"true,false" }}' === 'true');
+    })();
+
+    // 提交地陪/全陪问卷时，自动带上"新增团"区域字段
+    (function () {
+        const src = {
+            g_group_no: document.getElementById('group-create-group-no'),
+            g_agency: document.getElementById('group-create-agency'),
+            g_guide: document.getElementById('group-create-guide'),
+            g_hotel: document.getElementById('group-create-hotel'),
+            g_region: document.getElementById('group-create-region'),
+            g_people_count: document.getElementById('group-create-people-count'),
+            g_feedback_count: document.getElementById('group-create-feedback-count'),
+            g_date: document.getElementById('group-create-date'),
+        };
+
+        function bindForm(formSelector) {
+            const form = document.querySelector(formSelector);
+            if (!form) return;
+            form.addEventListener('submit', function () {
+                Object.keys(src).forEach(name => {
+                    const inp = form.querySelector(`input[name="${name}"]`);
+                    if (inp && src[name]) inp.value = src[name].value || '';
+                });
+            });
+        }
+
+        bindForm('#tab-local form');
+        bindForm('#tab-full form');
+    })();
+
+    // 团信息中的回收率实时计算：回收数 / 人数 / 2
+    (function () {
+        const peopleInput = document.getElementById('group-create-people-count');
+        const feedbackInput = document.getElementById('group-create-feedback-count');
+        const rateDisplay = document.getElementById('group-create-feedback-rate');
+        if (!peopleInput || !feedbackInput || !rateDisplay) return;
+
+        function renderRate() {
+            const pc = parseFloat(peopleInput.value || '0');
+            const fc = parseFloat(feedbackInput.value || '0');
+            if (!pc || pc <= 0 || Number.isNaN(pc) || Number.isNaN(fc)) {
+                rateDisplay.textContent = '\u00A0';
+                return;
+            }
+            rateDisplay.textContent = String(Math.round((fc / pc / 2) * 10000) / 10000);
+        }
+
+        peopleInput.addEventListener('input', renderRate);
+        feedbackInput.addEventListener('input', renderRate);
+        renderRate();
+    })();
+
+    // 团号读取数据库信息
+    (function () {
+        const btn = document.getElementById('group-read-btn');
+        const groupNoInput = document.getElementById('group-create-group-no');
+        if (!btn || !groupNoInput) return;
+
+        function setValue(id, val) {
+            const el = document.getElementById(id);
+            if (el) el.value = (val === null || val === undefined) ? '' : String(val);
+        }
+
+        btn.addEventListener('click', function () {
+            const groupNo = (groupNoInput.value || '').trim();
+            if (!groupNo) {
+                alert('请先输入团号。');
+                return;
+            }
+            fetch(GROUP_INFO_API_URL + '?group_no=' + encodeURIComponent(groupNo))
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.ok) {
+                        alert('数据库中未找到该团号。');
+                        return;
+                    }
+                    const g = data.group || {};
+                    setValue('group-create-group-no', g.group_no);
+                    setValue('group-create-people-count', g.people_count);
+                    setValue('group-create-feedback-count', g.feedback_count);
+                    setValue('group-create-date', g.date);
+                    const peopleEl = document.getElementById('group-create-people-count');
+                    const feedbackEl = document.getElementById('group-create-feedback-count');
+                    if (peopleEl) peopleEl.dispatchEvent(new Event('input'));
+                    if (feedbackEl) feedbackEl.dispatchEvent(new Event('input'));
+                })
+                .catch(() => {
+                    alert('读取失败，请稍后重试。');
+                });
+        });
     })();
 
     // 记住滚动位置：点击保存 / 删除 / 新增后返回原位置
@@ -505,4 +1003,3 @@ input[type="text"], input[type="number"], input[type="date"] { width: 120px; box
     })();
 </script>
 {% endblock %}
-

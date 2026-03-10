@@ -1,0 +1,2 @@
+conda activate DjangoFirst
+python manage.py runserver

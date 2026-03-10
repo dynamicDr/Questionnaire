@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block title %}供应商录入-导游{% endblock %}
+{% block extra_css %}
+table { border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 14px; }
+th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+th { background: var(--side-bg); }
+form.inline { display: inline-block; margin: 0; }
+input[type="text"], select { width: 150px; box-sizing: border-box; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; }
+.create-form-row { margin-bottom: 8px; }
+.create-form-row label { display: inline-block; width: 90px; }
+.submit-btn { padding: 6px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; border: 1px solid var(--border); background: var(--side-bg); color: var(--text); }
+.submit-btn:hover { background: var(--side-border); }
+ .overlay {
+     position: fixed;
+     left: 0;
+     top: 0;
+     right: 0;
+     bottom: 0;
+     background: rgba(0,0,0,0.4);
+     z-index: 1000;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+ }
+ .overlay-modal {
+     background: #fff;
+     padding: 20px 24px;
+     border-radius: 8px;
+     max-width: 480px;
+     width: 90%;
+     border: 1px solid var(--border);
+     font-size: 14px;
+ }
+ .overlay-modal h4 {
+     margin: 0 0 10px 0;
+ }
+ .overlay-modal p {
+     margin: 0 0 12px 0;
+ }
+ .overlay-modal .overlay-btns {
+     display: flex;
+     justify-content: flex-end;
+     gap: 10px;
+     margin-top: 8px;
+ }
+{% endblock %}
+{% block content %}
+<h1>供应商录入 - 导游</h1>
+
+{% if guide_exists %}
+<div class="overlay" id="guide-exists-overlay">
+    <div class="overlay-modal">
+        <h4>导游已存在</h4>
+        <p>导游「{{ existing_guide.name_cn }}」已存在，是否用当前填写的信息覆盖？</p>
+        <div style="font-size:13px; color:#555; margin-bottom:10px;">
+            <div>现有类型：{{ existing_guide.get_guide_type_display }}</div>
+            <div>现有英文名：{{ existing_guide.name_en }}</div>
+            <div>现有语种：{{ existing_guide.language }}</div>
+            <div>现有地区：{{ existing_guide.region }}</div>
+        </div>
+        <div class="overlay-btns">
+            <button type="button" class="submit-btn" id="guide-exists-cancel">取消</button>
+            <form method="post" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create">
+                <input type="hidden" name="confirm_overwrite" value="1">
+                <input type="hidden" name="guide_type" value="{{ create_form_data.guide_type }}">
+                <input type="hidden" name="name_cn" value="{{ create_form_data.name_cn }}">
+                <input type="hidden" name="name_en" value="{{ create_form_data.name_en }}">
+                <input type="hidden" name="language" value="{{ create_form_data.language }}">
+                <input type="hidden" name="region" value="{{ create_form_data.region }}">
+                <button type="submit" class="submit-btn">覆盖</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="section">
+    <h3>新增导游</h3>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create">
+        <div class="create-form-row">
+            <label>类型：</label>
+            <select name="guide_type">
+                <option value="{{ guide_type_local }}" {% if create_form_data.guide_type|default:guide_type_local == guide_type_local %}selected{% endif %}>地陪</option>
+                <option value="{{ guide_type_full }}" {% if create_form_data.guide_type|default:guide_type_local == guide_type_full %}selected{% endif %}>全陪</option>
+            </select>
+        </div>
+        <div class="create-form-row">
+            <label>中文名：</label>
+            <input type="text" name="name_cn" value="{{ create_form_data.name_cn|default:'' }}" required>
+        </div>
+        <div class="create-form-row">
+            <label>英文名：</label>
+            <input type="text" name="name_en" value="{{ create_form_data.name_en|default:'' }}">
+        </div>
+        <div class="create-form-row">
+            <label>语种：</label>
+            <input type="text" name="language" value="{{ create_form_data.language|default:'' }}">
+        </div>
+        <div class="create-form-row">
+            <label>地区：</label>
+            <input type="text" name="region" class="region-input" list="china-provinces" value="{{ create_form_data.region|default:'' }}">
+        </div>
+        <button type="submit" class="submit-btn">新增</button>
+    </form>
+</div>
+
+<div class="section">
+    <h3>导游列表</h3>
+    <table>
+        <thead>
+        <tr>
+            <th>类型</th>
+            <th>中文名</th>
+            <th>英文名</th>
+            <th>语种</th>
+            <th>地区</th>
+            <th>操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for g in guides %}
+            <tr>
+                <td>
+                    <form method="post" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="update">
+                        <input type="hidden" name="index" value="{{ g.id }}">
+                        <select name="guide_type">
+                            <option value="{{ guide_type_local }}" {% if g.guide_type == guide_type_local %}selected{% endif %}>地陪</option>
+                            <option value="{{ guide_type_full }}" {% if g.guide_type == guide_type_full %}selected{% endif %}>全陪</option>
+                        </select>
+                </td>
+                <td><input type="text" name="name_cn" value="{{ g.name_cn }}" required></td>
+                <td><input type="text" name="name_en" value="{{ g.name_en }}"></td>
+                <td><input type="text" name="language" value="{{ g.language }}"></td>
+                <td><input type="text" name="region" class="region-input" list="china-provinces" value="{{ g.region }}"></td>
+                <td>
+                        <button type="submit" class="submit-btn">保存</button>
+                    </form>
+                    <form method="post" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="index" value="{{ g.id }}">
+                        <button type="submit" class="submit-btn">删除</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="6">暂无导游数据。</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<datalist id="china-provinces"></datalist>
+{% endblock %}
+{% block extra_js %}
+<script>
+    (function () {
+        const regionDatalist = document.getElementById('china-provinces');
+        const regionInputs = Array.from(document.querySelectorAll('.region-input'));
+        if (!regionDatalist || !regionInputs.length) return;
+
+        const regionDefs = [
+            { name: '北京', aliases: ['bj', 'beijing'] }, { name: '天津', aliases: ['tj', 'tianjin'] },
+            { name: '上海', aliases: ['sh', 'shanghai'] }, { name: '重庆', aliases: ['cq', 'chongqing'] },
+            { name: '河北', aliases: ['hb', 'hebei'] }, { name: '山西', aliases: ['sx', 'shanxi'] },
+            { name: '辽宁', aliases: ['ln', 'liaoning'] }, { name: '吉林', aliases: ['jl', 'jilin'] },
+            { name: '黑龙江', aliases: ['hlj', 'heilongjiang'] }, { name: '江苏', aliases: ['js', 'jiangsu'] },
+            { name: '浙江', aliases: ['zj', 'zhejiang'] }, { name: '安徽', aliases: ['ah', 'anhui'] },
+            { name: '福建', aliases: ['fj', 'fujian'] }, { name: '江西', aliases: ['jx', 'jiangxi'] },
+            { name: '山东', aliases: ['sd', 'shandong'] }, { name: '河南', aliases: ['hn', 'henan'] },
+            { name: '湖北', aliases: ['hubei', 'hub'] }, { name: '湖南', aliases: ['hunan', 'hun'] },
+            { name: '广东', aliases: ['gd', 'guangdong'] }, { name: '海南', aliases: ['hainan', 'hain'] },
+            { name: '四川', aliases: ['sc', 'sichuan'] }, { name: '贵州', aliases: ['gz', 'guizhou'] },
+            { name: '云南', aliases: ['yn', 'yunnan'] }, { name: '陕西', aliases: ['sn', 'sxi', 'shaanxi'] },
+            { name: '甘肃', aliases: ['gs', 'gansu'] }, { name: '青海', aliases: ['qh', 'qinghai'] },
+            { name: '台湾', aliases: ['tw', 'taiwan'] }, { name: '内蒙古', aliases: ['nmg', 'neimenggu'] },
+            { name: '广西', aliases: ['gx', 'guangxi'] }, { name: '西藏', aliases: ['xz', 'xizang', 'tibet'] },
+            { name: '宁夏', aliases: ['nx', 'ningxia'] }, { name: '新疆', aliases: ['xj', 'xinjiang'] },
+            { name: '香港', aliases: ['hk', 'xg', 'xianggang'] }, { name: '澳门', aliases: ['mo', 'am', 'aomen', 'macau'] },
+        ];
+        const aliasToName = {};
+        regionDefs.forEach(item => item.aliases.forEach(a => { aliasToName[a] = item.name; }));
+
+        function setOptions(list, kw) {
+            regionDatalist.innerHTML = '';
+            const asciiKw = /^[a-z]+$/.test((kw || '').trim().toLowerCase());
+            list.forEach(item => {
+                const opt = document.createElement('option');
+                if (asciiKw) {
+                    const alias = item.aliases.find(a => a.indexOf((kw || '').trim().toLowerCase()) >= 0) || item.aliases[0];
+                    opt.value = `${alias} ${item.name}`;
+                } else {
+                    opt.value = item.name;
+                }
+                regionDatalist.appendChild(opt);
+            });
+        }
+
+        function normalizeInput(input) {
+            const raw = (input.value || '').trim();
+            if (!raw) return;
+            const key = raw.toLowerCase();
+            if (aliasToName[key]) {
+                input.value = aliasToName[key];
+                return;
+            }
+            const parts = raw.split(/\s+/);
+            if (parts.length >= 2) {
+                const maybeAlias = parts[0].toLowerCase();
+                const maybeName = parts.slice(1).join('');
+                if (aliasToName[maybeAlias] && aliasToName[maybeAlias] === maybeName) {
+                    input.value = maybeName;
+                }
+            }
+        }
+
+        function refreshOptions(raw) {
+            const kw = (raw || '').trim().toLowerCase();
+            if (!kw) {
+                setOptions(regionDefs, kw);
+                return;
+            }
+            const matched = regionDefs.filter(item => item.name.indexOf(raw.trim()) >= 0 || item.aliases.some(a => a.indexOf(kw) >= 0));
+            setOptions(matched.length ? matched : regionDefs, kw);
+        }
+
+        regionInputs.forEach(input => {
+            input.addEventListener('input', function () { refreshOptions(this.value || ''); });
+            input.addEventListener('focus', function () { refreshOptions(this.value || ''); });
+            input.addEventListener('change', function () { normalizeInput(this); });
+            input.addEventListener('blur', function () { normalizeInput(this); });
+        });
+        setOptions(regionDefs, '');
+    })();
+    (function () {
+        const overlay = document.getElementById('guide-exists-overlay');
+        const cancelBtn = document.getElementById('guide-exists-cancel');
+        if (overlay && cancelBtn) {
+            cancelBtn.addEventListener('click', function () {
+                overlay.style.display = 'none';
+            });
+        }
+    })();
+</script>
+{% endblock %}

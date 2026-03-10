@@ -17,10 +17,37 @@
         * { box-sizing: border-box; }
         body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; color: var(--text); background: var(--main-bg); min-height: 100vh; display: flex; }
         .sidebar { width: 220px; min-height: 100vh; background: var(--side-bg); border-right: 1px solid var(--side-border); padding: 16px 0; flex-shrink: 0; }
-        .sidebar-title { padding: 12px 16px; font-size: 15px; font-weight: 600; }
-        .sidebar-nav a { display: block; padding: 10px 16px; color: var(--text-muted); text-decoration: none; border-radius: 6px; margin: 2px 10px; }
+        .sidebar-nav a { display: block; padding: 10px 16px; color: var(--text-muted); text-decoration: none; border-radius: 6px; margin: 2px 10px; font-size: 14px; }
         .sidebar-nav a:hover { background: rgba(0,0,0,.06); color: var(--text); }
         .sidebar-nav a.active { background: rgba(16,163,127,.1); color: var(--accent); font-weight: 500; }
+        .nav-group { margin: 2px 10px; }
+        .nav-group > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 10px 16px;
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 14px;
+            user-select: none;
+            position: relative;
+            padding-right: 34px;
+        }
+        .nav-group > summary::-webkit-details-marker { display: none; }
+        .nav-group > summary::after {
+            content: '▸';
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 17px;
+            color: var(--text-muted);
+            transition: transform .15s ease;
+        }
+        .nav-group[open] > summary::after {
+            transform: translateY(-50%) rotate(90deg);
+        }
+        .nav-group > summary:hover { background: rgba(0,0,0,.06); color: var(--text); }
+        .sidebar-nav a.sub-item { padding-left: 30px; font-size: 14px; }
         .main { flex: 1; min-width: 0; padding: 24px 28px; }
         .main h1 { font-size: 22px; font-weight: 600; margin: 0 0 20px; }
         .section { border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; background: var(--main-bg); }
@@ -31,15 +58,49 @@
 </head>
 <body>
     <aside class="sidebar">
-        <div class="sidebar-title">问卷管理</div>
         <nav class="sidebar-nav">
             <a href="{% url 'questionnaire_add' %}" class="{% if request.resolver_match.url_name == 'questionnaire_add' %}active{% endif %}">问卷录入</a>
+            <a href="{% url 'info_modify' %}" class="{% if request.resolver_match.url_name == 'info_modify' %}active{% endif %}">信息修改</a>
             <a href="{% url 'questionnaire_view' %}" class="{% if request.resolver_match.url_name == 'questionnaire_view' %}active{% endif %}">问卷查看</a>
+            <details class="nav-group" data-nav-key="supplier-import" open>
+                <summary>供应商导入</summary>
+                <a href="{% url 'supplier_guide' %}" class="sub-item {% if request.resolver_match.url_name == 'supplier_guide' %}active{% endif %}">导游</a>
+                <a href="{% url 'supplier_hotel' %}" class="sub-item {% if request.resolver_match.url_name == 'supplier_hotel' %}active{% endif %}">酒店</a>
+                <a href="{% url 'supplier_agency' %}" class="sub-item {% if request.resolver_match.url_name == 'supplier_agency' %}active{% endif %}">地接社</a>
+                <a href="{% url 'supplier_vehicle' %}" class="sub-item {% if request.resolver_match.url_name == 'supplier_vehicle' %}active{% endif %}">车</a>
+                <a href="{% url 'supplier_meal' %}" class="sub-item {% if request.resolver_match.url_name == 'supplier_meal' %}active{% endif %}">餐</a>
+            </details>
+            <a href="{% url 'questionnaire_analysis' %}" class="{% if request.resolver_match.url_name == 'questionnaire_analysis' %}active{% endif %}">问卷分析</a>
         </nav>
     </aside>
     <main class="main">
         {% block content %}{% endblock %}
     </main>
+    <script>
+        (function () {
+            const SIDEBAR_GROUP_STATE_KEY = 'sidebar-nav-group-state';
+            let state = {};
+            try {
+                state = JSON.parse(localStorage.getItem(SIDEBAR_GROUP_STATE_KEY) || '{}');
+            } catch (e) {
+                state = {};
+            }
+
+            const groups = document.querySelectorAll('.nav-group');
+            groups.forEach((group, idx) => {
+                const key = group.dataset.navKey || ('group-' + idx);
+                if (Object.prototype.hasOwnProperty.call(state, key)) {
+                    group.open = !!state[key];
+                }
+                group.addEventListener('toggle', function () {
+                    state[key] = group.open;
+                    try {
+                        localStorage.setItem(SIDEBAR_GROUP_STATE_KEY, JSON.stringify(state));
+                    } catch (e) {}
+                });
+            });
+        })();
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
