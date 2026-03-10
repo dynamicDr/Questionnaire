@@ -7,7 +7,6 @@ PROJECT_DIR = Path(r"d:\projects\Questionnaire")  # 本地项目路径
 REMOTE_HOST = "root@8.145.46.18"
 REMOTE_PROJECT_DIR = "workspace/Questionnaire"
 REMOTE_CONDA_ENV = "DjangoFirst"
-COMMIT_MESSAGE = "auto"
 GUNICORN_SERVICE = "gunicorn"  # systemctl 服务名
 # ========================
 
@@ -25,9 +24,8 @@ def main():
     # 1. 本地 git add / commit / push
     print("=== 本地提交并推送代码 ===")
     run("git add .", cwd=PROJECT_DIR)
-    # 如果没有变更，git commit 会失败，这里允许继续执行
-    run(f'git commit -m "{COMMIT_MESSAGE}"', cwd=PROJECT_DIR, check=False)
-    run("git push", cwd=PROJECT_DIR)
+    run(f'git commit -m auto', cwd=PROJECT_DIR, check=False)
+    run("git push")
 
     # 2. 远程执行：git pull + conda 激活 + 重启 gunicorn
     print("\n=== 登录服务器并更新部署 ===")
