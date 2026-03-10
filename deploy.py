@@ -32,10 +32,7 @@ def main():
     remote_cmd = f"""
 cd {REMOTE_PROJECT_DIR} && \
 git stash && \
-git pull && \
-source ~/.bashrc && \
-conda activate {REMOTE_CONDA_ENV} && \
-exec bash --login
+git pull && 
 """.strip().replace("\n", " ")
 
     # 注意：需要本机已经配置好 SSH 免密或能输入密码
