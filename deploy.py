@@ -27,7 +27,7 @@ def main():
     run(f'git commit -m auto')
     run("git push")
 
-    run(f'ssh {REMOTE_HOST} "{remote_cmd}"')
+    run(f'ssh {REMOTE_HOST}')
 
 
 if __name__ == "__main__":
