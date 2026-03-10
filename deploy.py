@@ -69,12 +69,13 @@ def main():
         print(f"错误: {result.stderr}")
         return
     
-    print("\n=== 进入交互式 SSH 会话（已激活 conda 环境）===")
+    print("\n=== 进入交互式 SSH ===")
+    print("\n=== 激活conda环境：conda activate DjangoFirst ===")
+    print("\n=== 重启gunicorn：sudo systemctl restart gunicorn ===")
     # 命令执行成功后，进入交互式 SSH 并激活 conda 环境
     interactive_cmd = (
         f"cd {REMOTE_PROJECT_DIR} && "
         f"source ~/anaconda3/etc/profile.d/conda.sh && "
-        f"conda activate DjangoFirst && "
         f"bash"
     )
     
