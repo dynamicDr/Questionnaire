@@ -54,8 +54,9 @@ def main():
     # 先执行远程命令
     remote_cmd = (
         f"cd {REMOTE_PROJECT_DIR} && "
+        f"conda activate DjangoFirst && "
         f"git stash && "
-        f"git pull"
+        f"git pull &&"
     )
     
     result = subprocess.run(
