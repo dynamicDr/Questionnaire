@@ -94,7 +94,14 @@ input[type="text"], input[type="number"], input[type="date"], input[type="month"
 
         <div class="create-form-row">
             <label>团号：</label>
-            <input type="text" name="group_no" id="group-create-group-no" required value="{{ create_form_data.group_no|default:'' }}">
+            <input type="text"
+                   name="group_no"
+                   id="group-create-group-no"
+                   class="fuzzy-input"
+                   data-fuzzy-type="group"
+                   autocomplete="off"
+                   required
+                   value="{{ create_form_data.group_no|default:'' }}">
             <button type="button" class="submit-btn" id="group-read-btn" style="margin-left:8px;">读取</button>
         </div>
         <div class="create-form-row">
@@ -361,6 +368,7 @@ input[type="text"], input[type="number"], input[type="date"], input[type="month"
 </div>
 {{ supplier_agencies|json_script:"supplier-agency-data" }}
 {{ supplier_guides|json_script:"supplier-guide-data" }}
+{{ group_nos|json_script:"group-data" }}
 
 <script>
     const GROUP_INFO_API_URL = '{% url "group_info_api" %}';
@@ -565,10 +573,23 @@ input[type="text"], input[type="number"], input[type="date"], input[type="month"
             } catch (e) { console.error('解析导游数据失败', e); }
         }
 
+        // 团号数据：直接用团号字符串做模糊匹配（不需要拼音）
+        let groups = [];
+        const groupDataEl = document.getElementById('group-data');
+        if (groupDataEl) {
+            try {
+                const rawGroups = JSON.parse(groupDataEl.textContent || '[]');
+                groups = (rawGroups || [])
+                    .filter(g => g && String(g).trim())
+                    .map(g => FuzzyMatcher.createItem(String(g).trim(), []));
+            } catch (e) { console.error('解析团号数据失败', e); }
+        }
+
         return {
             region: regions,
             agency: agencies,
             guide: guides,
+            group: groups,
         };
     })();
 

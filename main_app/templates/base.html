@@ -63,7 +63,7 @@
             <a href="{% url 'info_modify' %}" class="{% if request.resolver_match.url_name == 'info_modify' %}active{% endif %}">信息修改</a>
             <a href="{% url 'questionnaire_view' %}" class="{% if request.resolver_match.url_name == 'questionnaire_view' %}active{% endif %}">问卷查看（未完成）</a>
             <details class="nav-group" data-nav-key="supplier-import" open>
-                <summary>供应商导入</summary>
+                <summary>供应商录入</summary>
                 <a href="{% url 'supplier_guide' %}" class="sub-item {% if request.resolver_match.url_name == 'supplier_guide' %}active{% endif %}">导游</a>
                 <a href="{% url 'supplier_hotel' %}" class="sub-item {% if request.resolver_match.url_name == 'supplier_hotel' %}active{% endif %}">酒店</a>
                 <a href="{% url 'supplier_agency' %}" class="sub-item {% if request.resolver_match.url_name == 'supplier_agency' %}active{% endif %}">地接社</a>

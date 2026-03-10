@@ -307,6 +307,7 @@ def _questionnaire_context(request, group_exists=False, existing_group=None, cre
 
     groups_qs = Group.objects.all().order_by('group_no').annotate(traveler_count=Count('travelers'))
     groups_for_view = [(g.id, _group_to_dict(g), g.traveler_count) for g in groups_qs]
+    group_nos = [g.group_no for g in groups_qs if g.group_no]
     travelers_qs = Traveler.objects.select_related('group').all().order_by('-id')
     travelers = [(t.id, _traveler_to_dict(t)) for t in travelers_qs]
     full_escorts_qs = FullEscort.objects.select_related('group').all().order_by('-id')
@@ -348,6 +349,7 @@ def _questionnaire_context(request, group_exists=False, existing_group=None, cre
 
     context = {
         'groups': groups_for_view,
+        'group_nos': group_nos,
         'travelers': travelers,
         'full_escorts': full_escorts,
         'supplier_agencies': supplier_agencies,
