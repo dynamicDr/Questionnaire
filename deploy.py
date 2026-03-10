@@ -46,19 +46,36 @@ def run_with_retry(cmd, retries=PUSH_RETRIES, delay=PUSH_RETRY_DELAY, cwd=None):
 def main():
     print("=== 本地提交并推送代码 ===")
     run("git add .")
-    run('git commit -m auto')
+    run('git commit -m "auto"')
     run_with_retry("git push")
-    # 进入服务器后执行一系列更新命令，并停留在远程 shell 中
-    # 使用 bash -lc 保证按登录 shell 方式加载环境，从而找到 conda
+    
+    print("\n=== 连接远程服务器并执行部署命令 ===")
+    
+    # 先执行远程命令
     remote_cmd = (
         f"cd {REMOTE_PROJECT_DIR} && "
         f"git stash && "
-        f"git pull && "
-        f"exec bash --login"
+        f"git pull"
     )
-    # bash -lc 会读取登录配置（通常会初始化 conda）
-    run(f'ssh {REMOTE_HOST} "bash -lc \'{remote_cmd}\'"')
-
+    
+    result = subprocess.run(
+        ["ssh", "root@8.145.46.18", remote_cmd],
+        capture_output=True,
+        text=True
+    )
+    
+    print(result.stdout)
+    if result.returncode != 0:
+        print(f"错误: {result.stderr}")
+        return
+    
+    print("\n=== 进入交互式 SSH 会话 ===")
+    # 命令执行成功后，进入交互式 SSH
+    subprocess.run([
+        "ssh", "-t",
+        "root@8.145.46.18",
+        f"cd {REMOTE_PROJECT_DIR} && bash"
+    ])
 
 if __name__ == "__main__":
     main()
