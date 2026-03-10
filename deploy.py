@@ -54,9 +54,8 @@ def main():
     # 先执行远程命令
     remote_cmd = (
         f"cd {REMOTE_PROJECT_DIR} && "
-        f"conda activate DjangoFirst && "
         f"git stash && "
-        f"git pull &&"
+        f"git pull"
     )
     
     result = subprocess.run(
@@ -70,12 +69,19 @@ def main():
         print(f"错误: {result.stderr}")
         return
     
-    print("\n=== 进入交互式 SSH 会话 ===")
-    # 命令执行成功后，进入交互式 SSH
+    print("\n=== 进入交互式 SSH 会话（已激活 conda 环境）===")
+    # 命令执行成功后，进入交互式 SSH 并激活 conda 环境
+    interactive_cmd = (
+        f"cd {REMOTE_PROJECT_DIR} && "
+        f"source ~/anaconda3/etc/profile.d/conda.sh && "
+        f"conda activate DjangoFirst && "
+        f"bash"
+    )
+    
     subprocess.run([
         "ssh", "-t",
         "root@8.145.46.18",
-        f"cd {REMOTE_PROJECT_DIR} && bash"
+        interactive_cmd
     ])
 
 if __name__ == "__main__":
