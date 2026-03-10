@@ -2,6 +2,7 @@
 conda activate DjangoFirst
 python manage.py runserver
 
+=========
 
 一键部署：
 python deploy.py
