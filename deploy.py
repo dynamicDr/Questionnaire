@@ -21,7 +21,6 @@ def run(cmd, cwd=None, check=True):
 
 
 def main():
-    # 1. 本地 git add / commit / push
     print("=== 本地提交并推送代码 ===")
     run("git add .")
     run(f'git commit -m auto')
