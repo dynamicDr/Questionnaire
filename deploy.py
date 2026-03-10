@@ -29,8 +29,6 @@ def main():
 
     run(f'ssh {REMOTE_HOST} "{remote_cmd}"')
 
-    print("\n=== 已登录到远程服务器 shell，可继续操作 ===")
-
 
 if __name__ == "__main__":
     main()
