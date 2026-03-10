@@ -26,7 +26,6 @@ def main():
     run("git add .")
     run(f'git commit -m auto')
     run("git push")
-
     run(f'ssh {REMOTE_HOST}')
 
 
