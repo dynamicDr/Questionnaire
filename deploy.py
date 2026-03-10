@@ -23,14 +23,15 @@ def run(cmd, cwd=None, check=True):
 def main():
     # 1. 本地 git add / commit / push
     print("=== 本地提交并推送代码 ===")
-    run("git add .", cwd=PROJECT_DIR)
-    run(f'git commit -m auto', cwd=PROJECT_DIR, check=False)
+    run("git add .")
+    run(f'git commit -m auto')
     run("git push")
 
     # 2. 远程执行：git pull + conda 激活 + 重启 gunicorn
     print("\n=== 登录服务器并更新部署 ===")
     remote_cmd = f"""
 cd {REMOTE_PROJECT_DIR} && \
+git stash && \  
 git pull && \
 source ~/.bashrc && \
 conda activate {REMOTE_CONDA_ENV}
