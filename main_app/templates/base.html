@@ -61,7 +61,7 @@
         <nav class="sidebar-nav">
             <a href="{% url 'questionnaire_add' %}" class="{% if request.resolver_match.url_name == 'questionnaire_add' %}active{% endif %}">问卷录入</a>
             <a href="{% url 'info_modify' %}" class="{% if request.resolver_match.url_name == 'info_modify' %}active{% endif %}">信息修改</a>
-            <a href="{% url 'questionnaire_view' %}" class="{% if request.resolver_match.url_name == 'questionnaire_view' %}active{% endif %}">问卷查看</a>
+            <a href="{% url 'questionnaire_view' %}" class="{% if request.resolver_match.url_name == 'questionnaire_view' %}active{% endif %}">问卷查看（未完成）</a>
             <details class="nav-group" data-nav-key="supplier-import" open>
                 <summary>供应商导入</summary>
                 <a href="{% url 'supplier_guide' %}" class="sub-item {% if request.resolver_match.url_name == 'supplier_guide' %}active{% endif %}">导游</a>

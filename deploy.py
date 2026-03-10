@@ -72,6 +72,7 @@ def main():
     print("\n=== 进入交互式 SSH ===")
     print("\n=== 激活conda环境：conda activate DjangoFirst ===")
     print("\n=== 重启gunicorn：sudo systemctl restart gunicorn ===")
+    print("\n=== 安装依赖：pip install -r requirements.txt ===")
     # 命令执行成功后，进入交互式 SSH 并激活 conda 环境
     interactive_cmd = (
         f"cd {REMOTE_PROJECT_DIR} && "
