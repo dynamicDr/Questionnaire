@@ -49,15 +49,15 @@ def main():
     run('git commit -m auto')
     run_with_retry("git push")
     # 进入服务器后执行一系列更新命令，并停留在远程 shell 中
-    remote_cmd = f"""
-cd {REMOTE_PROJECT_DIR} && \
-source ~/.bashrc && \
-conda activate {REMOTE_CONDA_ENV} && \
-git stash && \
-git pull && \
-exec bash --login
-""".strip().replace("\n", " ")
-    run(f'ssh {REMOTE_HOST} "{remote_cmd}"')
+    # 使用 bash -lc 保证按登录 shell 方式加载环境，从而找到 conda
+    remote_cmd = (
+        f"cd {REMOTE_PROJECT_DIR} && "
+        f"git stash && "
+        f"git pull && "
+        f"exec bash --login"
+    )
+    # bash -lc 会读取登录配置（通常会初始化 conda）
+    run(f'ssh {REMOTE_HOST} "bash -lc \'{remote_cmd}\'"')
 
 
 if __name__ == "__main__":
